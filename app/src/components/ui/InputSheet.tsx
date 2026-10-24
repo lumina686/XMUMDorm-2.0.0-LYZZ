@@ -30,6 +30,8 @@ export type InputSheetProps = {
   value: string;
   onChangeText?: (next: string) => void;
   placeholder?: string;
+  /** Accessible name independent of visible placeholder text. */
+  accessibilityLabel?: string;
   /** 发送键文案（动词开头，≤6 汉字） */
   sendLabel: string;
   onSend: () => void;
@@ -57,6 +59,7 @@ export function InputSheet({
   value,
   onChangeText,
   placeholder,
+  accessibilityLabel,
   sendLabel,
   onSend,
   maxLength,
@@ -134,7 +137,7 @@ export function InputSheet({
           multiline
           maxLength={maxLength}
           allowFontScaling
-          accessibilityLabel={placeholder}
+          accessibilityLabel={accessibilityLabel ?? placeholder}
           accessibilityState={{ disabled }}
           style={{
             flex: 1,

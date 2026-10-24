@@ -24,11 +24,11 @@
 .agent-action { background: var(--color-bg-surface); border: 1px solid var(--color-border-default); color: var(--color-text-secondary); white-space: nowrap; }
 .agent-primary, .agent-send { background: var(--color-brand-text); color: var(--color-text-on-brand); border: 1px solid transparent; }
 .agent-page button:disabled { opacity: .48; cursor: default; }
-.agent-page :is(button, a, textarea):focus-visible { outline: 2px solid var(--color-brand-text); outline-offset: 3px; }
+.agent-page :is(button, a, textarea, .agent-messages):focus-visible { outline: 2px solid var(--color-brand-text); outline-offset: 3px; }
 .agent-notice { background: var(--color-bg-warning-soft); color: var(--color-warning-text); border-radius: var(--radius-sm); padding: 12px 14px; font-size: 13px; margin-top: 12px; }
 .agent-notice a { margin-left: 12px; text-decoration: underline; color: inherit; }
 .agent-status { color: var(--color-text-secondary); font-size: 13px; padding: 12px 0; margin: 0; }
-.agent-messages { min-height: 300px; max-height: min(58dvh, 720px); overflow-y: auto; padding: 8px 4px 20px; overscroll-behavior: contain; }
+.agent-messages { min-height: 300px; max-height: min(58dvh, 720px); overflow-y: auto; padding: 8px 4px 20px; overscroll-behavior: contain; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: var(--color-text-secondary) transparent; }
 .agent-empty { padding: 40px 8px 20px; max-width: 560px; margin: auto; }
 .agent-empty-mark { color: var(--color-brand-text); border-bottom: 3px solid var(--color-brand-primary); display: inline-block; padding: 0 0 12px; }
 .agent-empty h2 { font-size: 25px; line-height: 1.5; margin: 20px 0 8px; letter-spacing: -.5px; }

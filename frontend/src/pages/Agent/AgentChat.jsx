@@ -7,6 +7,7 @@ import { ArrowLeft, ArrowUp, BookOpen, Check, History, MessageCircle, Plus, Tras
 import { useAuth } from '../../context/AuthContextState';
 import { useLanguage } from '../../context/LanguageContextState';
 import { createAgentConversation, deleteAgentConversation, getAgentConversation, listAgentConversations, restoreAgentConversation, streamAgentChat } from '@shared/api/agent';
+import { updateChatScroll } from '@shared/utils/chatScroll';
 import './AgentChat.css';
 
 export default function AgentChat() {
@@ -40,7 +41,8 @@ function AgentWorkspace({ userId, zh }) {
   const controller = useRef(null);
   const inFlight = useRef(false);
   const alive = useRef(true);
-  const tail = useRef(null);
+  const messageList = useRef(null);
+  const scrollState = useRef({ top: 0, following: true });
   const textarea = useRef(null);
   const historyDialog = useRef(null);
   const historyMutation = useRef(false);
@@ -68,7 +70,13 @@ function AgentWorkspace({ userId, zh }) {
     alive.current = true;
     return () => { alive.current = false; controller.current?.abort(); };
   }, []);
-  useEffect(() => { tail.current?.scrollIntoView({ block: 'nearest' }); }, [turn?.text, messages.length, pending.length]);
+  useEffect(() => {
+    const element = messageList.current;
+    if (!element || !scrollState.current.following) return;
+    // Scroll only the message list; never move the whole page or interrupt reading.
+    element.scrollTop = element.scrollHeight;
+    scrollState.current.top = element.scrollTop;
+  }, [turn?.text, messages.length, pending.length, id]);
   useEffect(() => {
     const dialog = historyDialog.current;
     if (historyOpen && !dialog.open) dialog.showModal();
@@ -77,6 +85,7 @@ function AgentWorkspace({ userId, zh }) {
 
   function select(value) {
     if (historyMutation.current) return;
+    scrollState.current = { top: 0, following: true };
     setSelected(value);
     setNotice('');
     setInput('');
@@ -124,6 +133,7 @@ function AgentWorkspace({ userId, zh }) {
   async function run(body) {
     if (inFlight.current || state?.running || (id && !state) || (!id && !body.message)) return;
     inFlight.current = true;
+    scrollState.current.following = true;
     setWorking(true);
     setNotice('');
     setTurn({ messages: state?.messages || [], question: body.message, text: '' });
@@ -158,7 +168,10 @@ function AgentWorkspace({ userId, zh }) {
         ]);
       }
       inFlight.current = false;
-      if (alive.current) { setTurn(null); setWorking(false); controller.current = null; textarea.current?.focus(); }
+      if (alive.current) {
+        setTurn(null); setWorking(false); controller.current = null;
+        if (scrollState.current.following) textarea.current?.focus({ preventScroll: true });
+      }
     }
   }
 
@@ -217,7 +230,15 @@ function AgentWorkspace({ userId, zh }) {
       {state?.exhausted && <div className="agent-status"><p>{zh ? '这个会话的额度已用完。' : 'Conversation limit reached.'}</p>
         <button type="button" className="agent-action" onClick={create} disabled={working}>{zh ? '开始新对话' : 'Start a new conversation'}</button>
       </div>}
-      <div className="agent-messages" role="log" aria-label={zh ? '对话记录' : 'Messages'}>
+      <div className="agent-messages" ref={messageList} role="log" tabIndex={0}
+        aria-label={zh ? '对话记录' : 'Messages'}
+        onWheel={event => { if (!event.ctrlKey && event.deltaY < 0) scrollState.current.following = false; }}
+        onScroll={event => {
+          const element = event.currentTarget;
+          scrollState.current = updateChatScroll(scrollState.current, {
+            top: element.scrollTop, height: element.scrollHeight, viewport: element.clientHeight,
+          });
+        }}>
         {id && detail.isPending ? <p className="agent-status" role="status">{zh ? '正在读取会话…' : 'Loading conversation…'}</p> : null}
         {!messages.length && !working && !error && (!id || state) && <div className="agent-empty">
           <div className="agent-empty-mark"><MessageCircle size={28} aria-hidden="true" /></div>
@@ -231,7 +252,6 @@ function AgentWorkspace({ userId, zh }) {
             ? <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ children, href }) => <a href={href} target="_blank" rel="noopener noreferrer">{children}</a> }}>{message.text}</ReactMarkdown>
             : <span className="agent-thinking" role="status">{zh ? '正在思考…' : 'Thinking…'}</span>}</div>
         </article>)}
-        <div ref={tail} />
       </div>
       {!!pending.length && !working && <section className="agent-confirm" aria-label={zh ? '待确认操作' : 'Approval required'}>
         <strong>{zh ? '请确认这些操作' : 'Review these actions'}</strong>
