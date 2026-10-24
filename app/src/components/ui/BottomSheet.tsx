@@ -69,7 +69,7 @@ export function BottomSheet({
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+      <View accessibilityViewIsModal style={{ flex: 1, justifyContent: 'flex-end' }}>
         <Pressable
           testID={testID ? `${testID}-backdrop` : undefined}
           accessibilityRole="button"
@@ -110,7 +110,6 @@ export function BottomSheet({
           </View>
 
           <View
-            accessibilityViewIsModal
             style={{
               flexDirection: 'row',
               alignItems: 'center',

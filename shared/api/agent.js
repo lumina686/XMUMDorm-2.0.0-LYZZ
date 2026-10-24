@@ -2,8 +2,8 @@ import { API_BASE_URL } from './config';
 import { getInjectedBaseUrl } from './platform';
 import { getToken } from './request';
 
-async function requestAgent(path, { body, signal, method = 'GET' } = {}) {
-  const response = await fetch(`${getInjectedBaseUrl() ?? API_BASE_URL}/api/agent${path}`, {
+async function requestAgent(path, { body, signal, method = 'GET', fetchImpl = globalThis.fetch } = {}) {
+  const response = await fetchImpl(`${getInjectedBaseUrl() ?? API_BASE_URL}/api/agent${path}`, {
     method, signal,
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (getToken() || '') },
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
@@ -52,8 +52,8 @@ export function createAgentEventParser(onEvent) {
   };
 }
 
-export async function streamAgentChat(body, onEvent, { signal } = {}) {
-  const response = await requestAgent('/chat', { method: 'POST', body, signal });
+export async function streamAgentChat(body, onEvent, { signal, fetchImpl } = {}) {
+  const response = await requestAgent('/chat', { method: 'POST', body, signal, fetchImpl });
   if (!response.headers.get('content-type')?.includes('text/event-stream') || !response.body) {
     throw new Error('无法读取回答，请刷新会话查看结果');
   }

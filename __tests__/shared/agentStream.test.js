@@ -39,3 +39,15 @@ test('keeps auth failure flags and forwards abort signals', async () => {
     .rejects.toMatchObject({ status: 403, body: { accountDeactivated: true } });
   expect(mock.mock.calls[0][1].signal).toBe(controller.signal);
 });
+
+test('uses a host-provided streaming fetch without changing the Web default', async () => {
+  const fallback = jest.spyOn(globalThis, 'fetch');
+  const hostFetch = jest.fn().mockResolvedValue(new Response('data: {"type":"done"}\n\n', {
+    headers: { 'Content-Type': 'text/event-stream' },
+  }));
+  const controller = new AbortController();
+  await streamAgentChat({ conversation_id: 'one', message: 'hello' }, () => {}, { signal: controller.signal, fetchImpl: hostFetch });
+  expect(fallback).not.toHaveBeenCalled();
+  expect(hostFetch).toHaveBeenCalledTimes(1);
+  expect(hostFetch.mock.calls[0][1]).toMatchObject({ signal: controller.signal, headers: { Authorization: 'Bearer fixture-token' } });
+});
