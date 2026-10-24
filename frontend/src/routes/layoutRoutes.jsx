@@ -53,6 +53,7 @@ const CourseReviewPage = lazy(() => import('../pages/Handbook/CourseReviewPage')
 const CourseReviewDetail = lazy(() => import('../pages/Handbook/CourseReviewDetail'));
 const CourseReviewCreate = lazy(() => import('../pages/Handbook/CourseReviewCreate'));
 const Schedule = lazy(() => import('../pages/Schedule'));
+const AgentChat = lazy(() => import('../pages/Agent/AgentChat'));
 const Diary = lazy(() => import('../pages/Diary'));
 const TodoList = lazy(() => import('../pages/TodoList'));
 const Holidays = lazy(() => import('../pages/Holidays'));
@@ -168,6 +169,8 @@ export const layoutRoutes = (
     <Route path="myzone/reviews" element={renderLazyRoute(MyReviews)} />
     <Route path="myzone/profile" element={renderLazyRoute(ProfileEdit)} />
     <Route path="myzone/schedule" element={renderLazyRoute(Schedule)} />
+    <Route path="agent" element={renderLazyRoute(AgentChat)} />
+    <Route path="myzone/agent" element={<Navigate to="/agent" replace />} />
     <Route path="myzone/todos" element={renderLazyRoute(TodoList)} />
     <Route path="myzone/holidays" element={renderLazyRoute(Holidays)} />
     <Route path="myzone/settings" element={renderLazyRoute(Settings)} />

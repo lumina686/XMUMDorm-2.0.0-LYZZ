@@ -5,6 +5,7 @@ import {
   Heart,
   HeartHandshake,
   Library,
+  MessageCircle,
   TreePine,
   ShoppingBag,
   UserRound,
@@ -14,7 +15,14 @@ import {
 
 export const SITE_PRIMARY_NAV_ITEMS = [
   {
-    // M09 万能墙：置于导航列首位（产品决策 #9）
+    key: 'agent',
+    labelZh: '校园助手',
+    labelEn: 'Campus assistant',
+    to: '/agent',
+    icon: MessageCircle,
+    matchPrefixes: ['/agent'],
+  },
+  {
     key: 'confession',
     labelZh: '万能墙',
     labelEn: 'Wall',
