@@ -1,5 +1,5 @@
 /**
- * 协作者本地预览网关。
+ * 协作者本地课程资料与指南只读预览网关。
  *
  * 只使用 PREVIEW_DATABASE_URL，绝不回退到应用运行时的 DATABASE_URL。
  * 生产环境必须把 PREVIEW_DATABASE_URL 配成只读账号或只读副本。
@@ -185,7 +185,52 @@ function createPreviewGateway({
     };
   }
 
-  return { enabled, authorize, listCourses, listMaterials };
+  async function exportGuides({ afterId = '0', snapshot = '', limit = '30' } = {}) {
+    if (!/^\d{1,15}$/.test(String(afterId)) || !/^\d{1,3}$/.test(String(limit))
+        || Number(limit) < 1 || Number(limit) > 30
+        || (snapshot && !/^[a-f0-9]{64}$/.test(String(snapshot)))
+        || (Number(afterId) > 0 && !snapshot)) {
+      const error = new Error('Invalid guide export cursor');
+      error.status = 400;
+      throw error;
+    }
+    // One SELECT creates a coherent snapshot. Reject oversize exports rather
+    // than silently losing articles. No author/account/interaction data or writes.
+    const [rows] = await readPool().execute(
+      `SELECT a.id, a.title, a.summary, a.content, a.content_type AS contentType,
+              a.external_url AS externalUrl, a.published_at AS publishedAt,
+              a.updated_at AS updatedAt, t.slug AS category
+         FROM handbook_articles a
+         JOIN handbook_tabs t ON t.id = a.tab_id
+        WHERE a.deleted_at IS NULL AND a.status = 'published' AND t.is_enabled = 1
+        ORDER BY a.id ASC LIMIT 1001`, []
+    );
+    const items = rows.map(row => ({
+      id: Number(row.id), title: row.title, summary: row.summary || '',
+      content: row.content || '', contentType: row.contentType || 'markdown',
+      externalUrl: row.externalUrl || null, publishedAt: row.publishedAt,
+      updatedAt: row.updatedAt, category: row.category, status: 'published',
+    }));
+    const serialized = JSON.stringify(items);
+    if (items.length > 1000 || Buffer.byteLength(serialized) > 10 * 1024 * 1024) {
+      const error = new Error('Guide export exceeds snapshot limit');
+      error.status = 413;
+      throw error;
+    }
+    const revision = crypto.createHash('sha256').update(serialized).digest('hex');
+    if (snapshot && snapshot !== revision) {
+      const error = new Error('Guide snapshot changed; restart the export');
+      error.status = 409;
+      throw error;
+    }
+    const remaining = items.filter(item => item.id > Number(afterId));
+    const page = remaining.slice(0, Number(limit));
+    const hasMore = remaining.length > page.length;
+    return { schemaVersion: 1, snapshot: revision, total: items.length, items: page,
+      hasMore, nextAfterId: hasMore ? page[page.length - 1].id : null };
+  }
+
+  return { enabled, authorize, listCourses, listMaterials, exportGuides };
 }
 
 module.exports = { createPreviewGateway, hashPreviewToken };

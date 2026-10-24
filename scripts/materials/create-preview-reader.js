@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 /**
- * 为课程资料只读预览网关创建最小权限的 MySQL 账号。
+ * 为课程资料与指南只读预览网关创建 MySQL 只读账号。
  *
  * 默认使用 PREVIEW_ADMIN_DATABASE_URL；未设置时才使用当前部署管理员连接
- * MYSQL_URL。脚本只授权 courses 和 materials 两张表的 SELECT。
+ * MYSQL_URL。脚本只授权课程资料和指南所需四张表的 SELECT。
  */
 
 require('dotenv').config();
@@ -14,7 +14,7 @@ const mysql = require('mysql2/promise');
 
 const USER = 'preview_reader';
 const HOST = '%';
-const TABLES = ['courses', 'materials'];
+const TABLES = ['courses', 'materials', 'handbook_articles', 'handbook_tabs'];
 
 function usage() {
   console.log('Usage: node scripts/materials/create-preview-reader.js [--dry-run]');

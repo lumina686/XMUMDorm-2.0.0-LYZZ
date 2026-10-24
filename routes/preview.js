@@ -1,5 +1,5 @@
 /**
- * 只读本地预览接口。只允许已登记协作者读取固定的课程资料数据。
+ * 只读本地预览接口。只允许已登记协作者读取固定的课程资料与已发布指南。
  */
 
 const express = require('express');
@@ -67,6 +67,20 @@ router.get('/materials', async (req, res, next) => {
     res.json({ status: 0, data: items });
   } catch (error) {
     next(error);
+  }
+});
+
+router.get('/handbook/export', async (req, res) => {
+  if (Object.keys(req.query).some(key => !['afterId', 'snapshot', 'limit'].includes(key))) {
+    return res.status(400).json({ status: -1, message: '不支持的导出参数' });
+  }
+  try {
+    const data = await gateway.exportGuides(req.query);
+    return res.json({ status: 0, data });
+  } catch (error) {
+    const status = [400, 409, 413].includes(error.status) ? error.status : 503;
+    return res.status(status).json({ status: -1,
+      message: status === 409 ? '指南已更新，请重新同步' : '指南导出暂不可用' });
   }
 });
 
