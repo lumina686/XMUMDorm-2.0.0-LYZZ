@@ -91,7 +91,7 @@ describe('P2D-02 安全区 10 条清单', () => {
     expect(layout).toMatch(/scheme === 'dark' \? 'light' : 'dark'/);
   });
 
-  it('第 6 条 · 大屏（`sw≥600dp`）：**只有两处读宽度**，未见断点式布局 → 未验', () => {
+  it('第 6 条 · 大屏（`sw≥600dp`）：读宽度的三处已登记，未见断点式布局 → 未验', () => {
     const walk = (dir: string, out: string[] = []): string[] => {
       for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         if (entry.name === '__tests__') continue;
@@ -112,6 +112,8 @@ describe('P2D-02 安全区 10 条清单', () => {
       // 2026-10-18：O06 BottomSheet 读窗口**高度**算半屏高度，不参与宽度断点
       path.join('components', 'ui', 'BottomSheet.tsx'),
       path.join('components', 'ui', 'Screen.tsx'),
+      // 登录页用视口宽高计算品牌画与曲线，不是 sw≥600dp 断点布局
+      path.join('features', 'auth', 'LoginLayout.tsx'),
     ]);
   });
 
