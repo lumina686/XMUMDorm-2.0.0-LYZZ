@@ -223,3 +223,26 @@ describe('store deletion permissions and simplified payment methods',()=>{
     expect(res.status).toBe(400);expect(pool.getConnection).not.toHaveBeenCalled();
   });
 });
+
+describe('merchant payment settings independent from student catalog',()=>{
+ const methods=[{id:'qr',name_zh:'演示收款',name_en:'Demo payment',qr_url:'/demo.png'}];
+ function access(role='merchant',member=true,stored=JSON.stringify(methods)){
+   query.mockImplementation(async(sql,params)=>{
+     if(sql.includes('FROM shop_merchants'))return [{id:1,slug:'water-home',enabled:1}];
+     if(sql.includes('SELECT role'))return [{role,status:'active'}];
+     if(sql.includes('shop_merchant_members'))return member?[{user_id:1}]:[];
+     if(sql.includes('FROM shop_settings')){expect(params).toEqual([1]);return stored===null?[]:[{id:1,payment_methods:stored}];}
+     return [];
+   });
+ }
+ test('requires authentication',async()=>{expect((await request(app).get('/api/shop/admin/settings')).status).toBe(401);});
+ test.each([['student',true],['merchant',false]])('%s cannot read another store settings',async(role,member)=>{access(role,member);expect((await authed('get','/admin/settings',role)).status).toBe(403);expect(query.mock.calls.some(([sql])=>sql.includes('FROM shop_settings'))).toBe(false);});
+ test.each(['merchant','admin'])('%s reads stored methods even without any open ordering slots',async role=>{access(role);const r=await authed('get','/admin/settings',role);expect(r.status).toBe(200);expect(r.body.data).toEqual({id:1,payment_methods:methods,has_payment_methods:true});expect(query.mock.calls.some(([sql])=>sql.includes('shop_slots'))).toBe(false);});
+ test('missing configuration is a valid empty result',async()=>{access('merchant',true,null);const r=await authed('get','/admin/settings','merchant');expect(r.status).toBe(200);expect(r.body.data.payment_methods).toEqual([]);expect(r.body.data.has_payment_methods).toBe(false);});
+ test('JSON-driver decoded array is supported',async()=>{access('merchant',true,methods);expect((await authed('get','/admin/settings','merchant')).body.data.payment_methods).toEqual(methods);});
+});
+
+test('payment settings database failure returns sanitized error without an empty success',async()=>{
+ query.mockImplementation(async sql=>{if(sql.includes('FROM shop_merchants'))return [{id:1}];if(sql.includes('SELECT role'))return [{role:'merchant',status:'active'}];if(sql.includes('shop_merchant_members'))return [{user_id:1}];if(sql.includes('FROM shop_settings'))throw Error('private-database-detail');return [];});
+ const log=jest.spyOn(console,'error').mockImplementation(()=>{});try{const r=await authed('get','/admin/settings','merchant');expect(r.status).toBe(500);expect(JSON.stringify(r.body)).not.toContain('private-database-detail');expect(r.body.data).toBeUndefined();}finally{log.mockRestore();}
+});

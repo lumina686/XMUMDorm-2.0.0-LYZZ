@@ -16,7 +16,7 @@ test('database URL has precedence and must use MySQL',()=>{
  expect(()=>databaseTarget({DATABASE_URL:'https://database.invalid/schema'})).toThrow('DATABASE_URL_INVALID');
 });
 test('production check rejects development config, missing JWT, unpersisted images and a disabled feature',()=>{
- expect(configurationIssues(local,['--production','--require-enabled']).errors).toEqual(expect.arrayContaining(['NODE_ENV_NOT_PRODUCTION','JWT_SECRET_REQUIRED','PRODUCTION_ABSOLUTE_ASSET_DIR_REQUIRED','SHOP_COUPONS_NOT_ENABLED']));
+ expect(configurationIssues({...local,SHOP_COUPONS_ENABLED:'0'},['--production','--require-enabled']).errors).toEqual(expect.arrayContaining(['NODE_ENV_NOT_PRODUCTION','JWT_SECRET_REQUIRED','PRODUCTION_ABSOLUTE_ASSET_DIR_REQUIRED','SHOP_COUPONS_NOT_ENABLED']));
 });
 test('object storage requires public HTTPS but does not pretend it tested bucket access',()=>{
  const env={NODE_ENV:'production',JWT_SECRET:'synthetic-test-key',SHOP_COUPONS_ENABLED:'1',OBJECT_STORAGE_BUCKET:'synthetic-bucket',PUBLIC_ASSET_BASE_URL:'http://example.test'};
@@ -33,3 +33,6 @@ test('partial migration or missing order uniqueness cannot be reported ready',as
  expect(await schemaStatus(schemaConnection('shop_coupon_redemptions.status'))).toMatchObject({ready:false,missing:['shop_coupon_redemptions.status']});
  expect(await schemaStatus(schemaConnection('order'))).toMatchObject({ready:false,missing:['shop_coupon_redemptions.unique(order_id)']});
 });
+
+test.each([undefined,'','auto','1'])('release enabled check permits automatic mode %s with separate schema verification',flag=>{expect(configurationIssues({...local,SHOP_COUPONS_ENABLED:flag},['--require-enabled']).errors).toEqual([]);});
+test('release check reports invalid flags even without require-enabled',()=>{expect(configurationIssues({...local,SHOP_COUPONS_ENABLED:'typo'},[]).errors).toContain('SHOP_COUPONS_CONFIGURATION_INVALID');});

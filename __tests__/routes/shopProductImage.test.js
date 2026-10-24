@@ -62,7 +62,7 @@ test('merchant cannot upload for another store',async()=>{
   query.mockImplementation(async sql=>sql.includes('FROM shop_merchants')?[{id:8}]:sql.includes('SELECT role')?[{role:'merchant',status:'active'}]:sql.includes('SELECT status FROM users')?[{status:'active'}]:[]);
   expect((await upload('merchant',png)).status).toBe(403);
 });
-test.each([['forged',Buffer.from('invalid'),'image/png'],['mime mismatch',null,'image/jpeg']])('rejects %s image',async(_,bytes,type)=>{
+test.each([['forged',Buffer.from('invalid'),'image/png'],['SVG with PNG MIME',Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>'),'image/png']])('rejects %s image',async(_,bytes,type)=>{
   expect((await upload('merchant',bytes||png,type)).status).toBe(400);expect(storage.uploadBuffer).not.toHaveBeenCalled();
 });
 test('rejects files larger than 5MB',async()=>expect((await upload('merchant',Buffer.alloc(5*1024*1024+1))).status).toBe(400));
@@ -77,5 +77,13 @@ test('invalid public storage URL fails without uploading',async()=>{
 test('storage failure does not return a broken success URL or leak secrets',async()=>{
   storage.isObjectStorageConfigured.mockReturnValue(true);storage.uploadBuffer.mockRejectedValue(Error('secret-storage-detail'));
   const spy=jest.spyOn(console,'error').mockImplementation(()=>{});
-  try{const r=await upload('merchant',png);expect(r.status).toBe(500);expect(JSON.stringify(r.body)).not.toContain('secret-storage-detail');}finally{spy.mockRestore();}
+  try{const r=await upload('merchant',png);expect(r.status).toBe(503);expect(r.body.message).toContain('Image storage unavailable');expect(JSON.stringify(r.body)).not.toContain('secret-storage-detail');}finally{spy.mockRestore();}
+});
+
+test.each(['image/x-png','application/octet-stream','image/jpeg'])('real PNG accepts unreliable MIME %s and produces safe WebP',async type=>{
+ const r=await upload('merchant',png,type);expect(r.status).toBe(200);const image=await request(app).get(r.body.data.url);expect(image.status).toBe(200);expect((await sharp(image.body).metadata()).format).toBe('webp');
+});
+test('oversized image dimensions give resize guidance rather than invalid-format message',async()=>{
+ const large=await sharp({create:{width:4001,height:4001,channels:3,background:'#173874'}}).png().toBuffer();
+ const r=await upload('merchant',large);expect(r.status).toBe(400);expect(r.body.message).toContain('16 megapixels');expect(storage.uploadBuffer).not.toHaveBeenCalled();
 });

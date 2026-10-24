@@ -1,18 +1,16 @@
 const crypto = require('crypto');
 const { query, pool } = require('../database');
 const sanitize = require('sanitize-html');
+const { couponMode, checkCouponSchema } = require('./shopCouponSchema');
 const {inlineLimit,inlineOffset}=require('../utils/sqlLimit');
 function fail(message, code, status = 409) { throw Object.assign(new Error(message), { status, publicCode: code }); }
-function enabled() { return process.env.SHOP_COUPONS_ENABLED === '1'; }
+function enabled() { return ['auto','on'].includes(couponMode()); }
 async function ready() {
   if (!enabled()) return false;
-  try {
-    const rows = await query(`SELECT TABLE_NAME,COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND
-      ((TABLE_NAME='shop_orders' AND COLUMN_NAME IN ('subtotal_cents','discount_cents','coupon_json'))
-      OR (TABLE_NAME='shop_coupons' AND COLUMN_NAME='id') OR (TABLE_NAME='shop_coupon_redemptions' AND COLUMN_NAME='id'))`);
-    return rows.length === 5;
-  } catch { return false; }
+  try { return (await checkCouponSchema(query)).ready; }
+  catch { return false; }
 }
+
 async function requireReady() {
   if (!await ready()) fail('优惠券暂未开放，请稍后重试 / Coupons are unavailable', 'COUPONS_UNAVAILABLE', 503);
 }

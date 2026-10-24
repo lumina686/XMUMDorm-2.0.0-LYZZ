@@ -76,6 +76,11 @@ router.use('/admin', (req, res, next) => {
   });
   next();
 });
+router.get('/admin/settings', wrap(async (req,res)=>{
+  const rows=await query('SELECT id,payment_methods FROM shop_settings WHERE id = ?', [req.merchant.id]);
+  const methods=s.paymentMethods(rows[0]?.payment_methods);
+  ok(res,{id:req.merchant.id,payment_methods:methods,has_payment_methods:methods.length>0});
+}));
 router.get('/admin/coupons',wrap(async(req,res)=>ok(res,await coupons.list(req.merchant.id,req.query))));
 router.post('/admin/coupons',wrap(async(req,res)=>ok(res,await coupons.create(req.merchant.id,req.user.id,req.body,req.get('Idempotency-Key')))));
 router.patch('/admin/coupons/:id/status',wrap(async(req,res)=>ok(res,await coupons.setStatus(req.merchant.id,id(req.params.id),req.body.status))));
@@ -89,7 +94,7 @@ router.delete('/admin/store', wrap(async (req,res)=>{
   ok(res,{deleted:true});
 }));
 
-const productImageUpload=multer({storage:multer.memoryStorage(),limits:{fileSize:5*1024*1024,files:1},fileFilter:(req,file,cb)=>cb(null,['image/jpeg','image/png','image/webp'].includes(file.mimetype))});
+const productImageUpload=multer({storage:multer.memoryStorage(),limits:{fileSize:5*1024*1024,files:1}});
 router.post('/admin/product-images',(req,res,next)=>productImageUpload.single('image')(req,res,err=>err?res.status(400).json({status:-1,message:'请上传不超过5MB的 JPG、PNG 或 WebP 图片'}):next()),wrap(async(req,res)=>{
  if(!req.file)s.fail('请选择 JPG、PNG 或 WebP 图片');
  ok(res,{url:await require('../services/shopProductImage').saveProductImage(req.file,req.merchant.id)});

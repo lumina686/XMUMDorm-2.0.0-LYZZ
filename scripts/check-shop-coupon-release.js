@@ -2,11 +2,7 @@
 const fs = require('fs');
 const mysql = require('mysql2/promise');
 const dotenv = require('dotenv');
-const REQUIRED = {
-  shop_orders: ['subtotal_cents','discount_cents','coupon_json'],
-  shop_coupons: ['id','merchant_id','code','name_zh','name_en','discount_cents','min_subtotal_cents','starts_at','ends_at','total_limit','per_user_limit','reserved_count','redeemed_count','status','created_by','create_key','create_hash','created_at','updated_at'],
-  shop_coupon_redemptions: ['id','coupon_id','order_id','user_id','discount_cents','status','redeemed_at','released_at','created_at','updated_at'],
-};
+const { REQUIRED, couponMode, checkCouponSchema } = require('../services/shopCouponSchema');
 function readEnvironment(args) {
   const i = args.indexOf('--env');
   if (args.includes('--process-env') === (i >= 0)) throw Error('CHOOSE_ENV_FILE_OR_PROCESS_ENV');
@@ -25,7 +21,9 @@ function databaseTarget(env) {
 }
 function configurationIssues(env,args) {
   const errors=[],warnings=[];
-  if (args.includes('--require-enabled') && env.SHOP_COUPONS_ENABLED !== '1') errors.push('SHOP_COUPONS_NOT_ENABLED');
+  const mode = couponMode(env);
+  if (mode === 'invalid') errors.push('SHOP_COUPONS_CONFIGURATION_INVALID');
+  if (args.includes('--require-enabled') && mode === 'off') errors.push('SHOP_COUPONS_NOT_ENABLED');
   if (args.includes('--production')) {
     if (env.NODE_ENV !== 'production') errors.push('NODE_ENV_NOT_PRODUCTION');
     if (!env.JWT_SECRET || env.JWT_SECRET === 'your-secret-key-change-in-production') errors.push('JWT_SECRET_REQUIRED');
@@ -40,19 +38,12 @@ function configurationIssues(env,args) {
   return {errors,warnings};
 }
 async function schemaStatus(conn) {
-  const [rows]=await conn.execute("SELECT TABLE_NAME,COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('shop_orders','shop_coupons','shop_coupon_redemptions')");
-  const found=new Set(rows.map(r=>r.TABLE_NAME+'.'+r.COLUMN_NAME));
-  const missing=Object.entries(REQUIRED).flatMap(([table,columns])=>columns.filter(col=>!found.has(table+'.'+col)).map(col=>table+'.'+col));
-  const [indexes]=await conn.execute("SELECT TABLE_NAME,INDEX_NAME,COLUMN_NAME,SEQ_IN_INDEX FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND NON_UNIQUE=0 AND TABLE_NAME IN ('shop_coupons','shop_coupon_redemptions') ORDER BY TABLE_NAME,INDEX_NAME,SEQ_IN_INDEX");
-  const groups=new Map();for(const r of indexes){const k=r.TABLE_NAME+'.'+r.INDEX_NAME;groups.set(k,[...(groups.get(k)||[]),r.COLUMN_NAME]);}
-  for(const [table,columns] of [['shop_coupons',['code']],['shop_coupons',['created_by','create_key']],['shop_coupon_redemptions',['order_id']]]) {
-    if(![...groups].some(([key,cols])=>key.startsWith(table+'.')&&JSON.stringify(cols)===JSON.stringify(columns)))missing.push(table+'.unique('+columns.join(',')+')');
-  }
-  return {ready:missing.length===0,missing};
+  return checkCouponSchema(async sql => { const [rows] = await conn.execute(sql); return rows; });
 }
+
 async function main(args) {
   const env=readEnvironment(args),target=databaseTarget(env),checks=configurationIssues(env,args);
-  const result={source:args.includes('--process-env')?'server-process-environment':'explicit-env-file',...checks,databaseChecked:false};
+  const result={source:args.includes('--process-env')?'server-process-environment':'explicit-env-file',...checks,couponMode:couponMode(env),databaseChecked:false};
   if(!args.includes('--no-database')) {
     if(!['localhost','127.0.0.1','::1','[::1]'].includes(target.host)&&!args.includes('--allow-remote'))throw Error('REMOTE_CHECK_REQUIRES_ALLOW_REMOTE');
     const conn=await mysql.createConnection({...target.config,multipleStatements:false});

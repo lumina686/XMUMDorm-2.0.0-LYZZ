@@ -93,4 +93,27 @@ integration('coupon transactions against isolated MySQL',()=>{
     process.env.SHOP_COUPONS_ENABLED='0';
     try{const order=await s.checkout(f.u1,{...f.body,coupon_code:'',expected_total_cents:2000},'plain-order-key-'+f.u1,f.mid);expect(order.order.total_cents).toBe(2000);}finally{process.env.SHOP_COUPONS_ENABLED='1';}
   });
+  test('unset flag supports issue, quote, discounted checkout, payment proof, redemption and completed delivery',async()=>{
+    delete process.env.SHOP_COUPONS_ENABLED;
+    try {
+      expect(await c.ready()).toBe(true);const f=await fixture();
+      const quote=await s.checkout(f.u1,{slot_id:f.body.slot_id,payment_method:'qr',coupon_code:f.coupon.code},'auto-quote-readonly',f.mid,{quote:true});
+      expect(quote).toMatchObject({subtotal_cents:2000,discount_cents:500,total_cents:1500});
+      const first=await s.checkout(f.u1,f.body,'auto-checkout-key-'+f.u1,f.mid);
+      const replay=await s.checkout(f.u1,f.body,'auto-checkout-key-'+f.u1,f.mid);expect(replay.order.id).toBe(first.order.id);
+      expect(await counts(f.coupon.id)).toEqual({reserved_count:1,redeemed_count:0});
+      await query("INSERT INTO shop_payment_proofs(order_id,content_type,image) VALUES (?,'image/png',?)",[first.order.id,Buffer.from('synthetic-auto-mode-proof')]);
+      for(const next of ['confirmed','preparing','delivering','completed'])expect((await s.changeStatus(first.order.id,next,f.mid)).status).toBe(next);
+      expect(await counts(f.coupon.id)).toEqual({reserved_count:0,redeemed_count:1});
+      expect((await query('SELECT total_cents FROM shop_orders WHERE id=?',[first.order.id]))[0].total_cents).toBe(1500);
+    } finally { process.env.SHOP_COUPONS_ENABLED='1'; }
+  });
+  test('explicit pause blocks new coupon use while plain orders remain available in auto-capable backend',async()=>{
+    const f=await fixture();process.env.SHOP_COUPONS_ENABLED='0';
+    try{await expect(s.checkout(f.u1,f.body,'auto-pause-key-'+f.u1,f.mid)).rejects.toMatchObject({publicCode:'COUPONS_UNAVAILABLE'});
+      expect(await counts(f.coupon.id)).toEqual({reserved_count:0,redeemed_count:0});
+      const plain=await s.checkout(f.u1,{...f.body,coupon_code:'',expected_total_cents:2000},'auto-plain-key-'+f.u1,f.mid);expect(plain.order.total_cents).toBe(2000);
+    }finally{process.env.SHOP_COUPONS_ENABLED='1';}
+  });
+
 });

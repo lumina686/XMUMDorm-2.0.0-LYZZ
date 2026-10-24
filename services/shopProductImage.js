@@ -13,11 +13,12 @@ async function saveProductImage(file, merchantId) {
   try {
     const input = sharp(file.buffer, { limitInputPixels: 16000000 });
     const metadata = await input.metadata();
-    const expected = { 'image/jpeg': 'jpeg', 'image/png': 'png', 'image/webp': 'webp' }[file.mimetype];
-    if (!expected || metadata.format !== expected) throw Error('format');
+    // Decode actual bytes rather than trusting OS/browser MIME declarations.
+    if (!['jpeg','png','webp'].includes(metadata.format)) throw Error('format');
     image = await input.rotate().resize({ width: 2400, height: 2400, fit: 'inside', withoutEnlargement: true })
       .webp({ quality: 90 }).toBuffer();
-  } catch {
+  } catch (error) {
+    if (/pixel limit/i.test(error.message)) fail('图片像素过大，请缩小至1600万像素以内 / Image exceeds 16 megapixels');
     fail('请选择有效 JPG、PNG 或 WebP 图片 / Invalid product image');
   }
   const name = crypto.randomBytes(18).toString('hex') + '.webp';
@@ -25,7 +26,8 @@ async function saveProductImage(file, merchantId) {
     const key = `shop/products/${merchantId}/${name}`;
     const url = storage.publicUrlForKey(key);
     if (!url || !url.startsWith('https://')) fail('商品图片存储未配置公开 HTTPS 地址 / Public HTTPS storage URL required', 503);
-    await storage.uploadBuffer({ key, body: image, contentType: 'image/webp' });
+    try { await storage.uploadBuffer({ key, body: image, contentType: 'image/webp' }); }
+    catch { fail('图片存储暂不可用，请稍后重试或联系管理员 / Image storage unavailable. Retry or contact support',503); }
     return url;
   }
   if (process.env.NODE_ENV === 'production' && !process.env.SHOP_ASSET_DIR) {

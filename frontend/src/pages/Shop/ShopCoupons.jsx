@@ -49,7 +49,7 @@ export default function ShopCoupons({slug,isZh}) {
   const status=useMutation({mutationFn:row=>api.couponStatus(row.id,row.status==='active'?'disabled':'active'),onSuccess:()=>qc.invalidateQueries({queryKey:['shop',slug,'coupons']}),onError:error=>setMessage(error.message)});
   if(catalog.isPending)return <p role="status">{t('正在检查优惠券…','Checking coupons…')}</p>;
   if(catalog.error)return <p role="alert">{catalog.error.message}<Button onClick={()=>catalog.refetch()}>{t('重试','Retry')}</Button></p>;
-  if(!available)return <p role="status">{t('优惠券尚未开放，请完成数据库迁移并开启优惠券配置。原有下单不受影响。','Coupons are not enabled. Complete the migration and enable coupons. Regular orders remain available.')}</p>;
+  if(!available)return <div role="status"><p>{t('优惠券暂不可用，请稍后重试或联系管理员。原有下单不受影响。','Coupons are temporarily unavailable. Retry or contact support. Regular orders remain available.')}</p><Button variant="outline" onClick={()=>catalog.refetch()}>{t('重新检查','Check again')}</Button></div>;
   return <section className="shop-coupons"><h2>{t('店铺优惠券','Store coupons')}</h2>
     <p>{t('固定金额优惠，仅本店使用。每个账号每券一次，付款核实前取消可返还次数。停用不影响已创建订单。所有时间为校园时间 UTC+8。','Fixed discounts for this store only. Once per account; cancellation before payment verification releases the use. Disabling does not change existing orders. All times are campus time UTC+8.')}</p>
     {message&&<p className="shop-notice" role="status">{message}</p>}

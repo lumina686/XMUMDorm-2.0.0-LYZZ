@@ -27,6 +27,7 @@ return {
   saveProduct: p => request(`${base}/admin/products/${p.id || 'new'}`, { method: 'PUT', body: p }),
   specialSlots: () => request(`${base}/admin/special-slots`),
   saveSpecialSlot: p => request(`${base}/admin/special-slots/${p.id || 'new'}`, { method: 'PUT', body: p }),
+  settings: () => request(`${base}/admin/settings`),
   saveSettings: body => request(`${base}/admin/settings`, { method: 'PUT', body }),
   deleteMyStore: () => request(`${base}/admin/store`, { method: 'DELETE' }),
   adminStores: () => request('/api/shop/admin/stores'),
