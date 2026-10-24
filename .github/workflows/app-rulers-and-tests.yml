@@ -6,7 +6,7 @@ name: app-rulers-and-tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev-me]
     paths:
       - 'app/**'
       - 'frontend/**'
@@ -40,6 +40,14 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/app-rulers-and-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-rulers-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   rulers:
