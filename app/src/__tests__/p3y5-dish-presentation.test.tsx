@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { fireEvent, waitFor, within } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 import { renderApp } from './helpers/renderApp';
 import { clearNamespace } from '@/shared/storage';
 import { DishDetail } from '@/features/square/DishDetail';
@@ -25,6 +26,8 @@ it('renders the actions bar in the screen footer slot, outside the scrolling con
   expect(within(view.getByTestId('screen-footer')).getByTestId('dish-actions-footer')).toBeTruthy();
   expect(within(view.getByTestId('dish-scroll')).queryByTestId('dish-actions-footer')).toBeNull();
   expect(view.queryByTestId('dish-actions-overlay')).toBeNull();
+  const scrollStyle = StyleSheet.flatten(view.getByTestId('dish-scroll').props.contentContainerStyle);
+  expect(scrollStyle.paddingBottom).toBe(scrollStyle.padding);
   expect(view.getByTestId('dish-images-placeholder')).toBeTruthy();
 });
 it('uses one image entry until the review limit and enables it again after removal', async () => {
