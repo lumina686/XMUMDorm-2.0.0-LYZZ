@@ -137,7 +137,17 @@ export function DishDetail(): React.ReactElement {
   if (reply && reply.productId === productId && reply.owner === owner && comments.some((comment) => comment.id === reply.parentId && comment.parentId === null)) return <ReviewScreen productId={productId} parentId={reply.parentId} titleKey="screen.campus.read.reply" onCancel={() => setReply(null)} onSettled={() => setReply(null)} />;
 
   return (
-    <Screen testID="screen-dish" titleKey="canteen.dishTitle" bottomMode="own" {...badge}>
+    <Screen
+      testID="screen-dish"
+      titleKey="canteen.dishTitle"
+      bottomMode="own"
+      {...badge}
+      footer={detail.data ? (
+        <View testID="dish-actions-footer" style={{ paddingHorizontal: theme.space('space_4'), paddingTop: theme.space('space_2') }}>
+          <Surface rounded="radius_medium" bordered="subtle" padding="space_2"><DishActions productId={productId} /></Surface>
+        </View>
+      ) : undefined}
+    >
       <View style={{ flex: 1 }}>
       <ScrollView testID="dish-scroll" contentContainerStyle={{ padding: theme.space('space_4'), gap: theme.space('space_4'), paddingBottom: actionsHeight + theme.space('space_4') }}>
         {detail.stale ? <OfflineBanner testID="dish-stale" variant="stale" message={t('canteen.cache.stale')} actionLabel={t('action.refresh')} onAction={detail.reload} /> : null}
@@ -240,9 +250,6 @@ export function DishDetail(): React.ReactElement {
           </>
         )}
       </ScrollView>
-      {detail.data ? <View testID="dish-actions-overlay" onLayout={(event) => setActionsHeight(event.nativeEvent.layout.height)} style={{ position: 'absolute', bottom: theme.space('space_2'), left: theme.space('space_4'), right: theme.space('space_4') }}>
-        <Surface rounded="radius_medium" bordered="subtle" padding="space_2"><DishActions productId={productId} /></Surface>
-      </View> : null}
       </View>
     </Screen>
   );
