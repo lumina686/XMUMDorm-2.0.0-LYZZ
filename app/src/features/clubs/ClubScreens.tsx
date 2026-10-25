@@ -11,6 +11,7 @@ import { FilterChips } from '@/components/ui/FilterChips';
 import { InlineNotice } from '@/components/ui/InlineNotice';
 import { Input } from '@/components/ui/Input';
 import { ListScreen, useListPagination } from '@/components/ui/ListScreen';
+import { ListItem } from '@/components/ui/ListItem';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { MediaGrid } from '@/components/ui/MediaGrid';
 import { Screen } from '@/components/ui/Screen';
@@ -283,11 +284,11 @@ export function ClubProfileScreen({ clubId }: { clubId: string }): React.ReactEl
         <Text role="caption">{t('clubs.members', { n: members.length })}</Text>
         {activities.length > 0 ? <Text role="headline">{t('clubs.activities')}</Text> : null}
         {activities.map((activity) => (
-          <Button key={activity.id} testID={`club-profile-activity-${activity.id}`} label={activity.title} variant="secondary" onPress={() => router.push(`/clubs/activity/${activity.id}` as never)} />
+          <ListItem key={activity.id} testID={`club-profile-activity-${activity.id}`} title={activity.title} onPress={() => router.push(`/clubs/activity/${activity.id}` as never)} />
         ))}
         {posts.length > 0 ? <Text role="headline">{t('clubs.posts')}</Text> : null}
         {posts.map((post) => (
-          <Button key={post.id} testID={`club-profile-post-${post.id}`} label={post.content} variant="secondary" onPress={() => router.push(`/clubs/post/${post.id}` as never)} />
+          <ListItem key={post.id} testID={`club-profile-post-${post.id}`} title={post.content} onPress={() => router.push(`/clubs/post/${post.id}` as never)} />
         ))}
         {basicInfo.viewer.canManage ? (
           <Button testID="club-profile-manage" label={t('clubs.manage')} variant="secondary" onPress={() => router.push(`/clubs/${profile.id}/manage` as never)} />
@@ -418,8 +419,8 @@ export function ClubManageScreen({ clubId }: { clubId: string }): React.ReactEle
         ) : null}
         <Text role="headline">{t('clubs.members', { n: managedProfile.members.length })}</Text>
         {managedProfile.members.map((member) => <View key={member.id} testID={`club-manage-member-${member.id}`} style={{ gap: theme.space('space_1') }}><Text role="body">{member.nickname}</Text><Text role="caption" colorToken="text-muted">{t(member.role === 'admin' ? 'clubs.role.admin' : 'clubs.role.member')}</Text>{member.role === 'member' ? <Button testID={`club-manage-remove-${member.id}`} label={t('clubs.removeMember')} variant="danger" onPress={() => setRemoving(member)} /> : null}</View>)}
-        {activities.map((activity) => <Button key={activity.id} label={`${t('clubs.deleteActivity')} · ${activity.title}`} variant="danger" onPress={() => void mutate(() => deleteClubActivity(activity.id))} />)}
-        {posts.map((post) => <Button key={post.id} label={`${t('clubs.deletePost')} · ${post.content}`} variant="danger" onPress={() => void mutate(() => deleteClubPost(post.id))} />)}
+        {activities.map((activity) => <View key={activity.id} style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space('space_2') }}><View style={{ flex: 1 }}><Text role="body">{activity.title}</Text></View><Button testID={`club-manage-delete-activity-${activity.id}`} label={t('clubs.deleteActivity')} variant="danger" onPress={() => void mutate(() => deleteClubActivity(activity.id))} /></View>)}
+        {posts.map((post) => <View key={post.id} style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space('space_2') }}><View style={{ flex: 1 }}><Text role="body">{post.content}</Text></View><Button testID={`club-manage-delete-post-${post.id}`} label={t('clubs.deletePost')} variant="danger" onPress={() => void mutate(() => deleteClubPost(post.id))} /></View>)}
       </View>
       <AlertDialog testID="club-manage-remove-dialog" visible={removing !== null} variant="danger" title={t('clubs.removeMember')} body={t('clubs.removeMemberBody')} confirmLabel={t('clubs.removeMember')} cancelLabel={t('action.cancel')} onCancel={() => setRemoving(null)} onConfirm={() => { const member = removing; setRemoving(null); if (member) void mutate(() => removeClubMember(managedProfile.id, member.id)); }} />
     </Screen>
@@ -523,7 +524,7 @@ export function ClubActivityDetailScreen({ activityId }: { activityId: string })
       onToggleLike={() => void like.toggle()}
       interactions={{ liked: like.liked, likeCount: like.count, commentCount: detail.stats.comments }}
       hero={detail.images.length > 0 ? <MediaGrid testID="club-activity-media" variant="hero" uris={detail.images} /> : undefined}
-      body={<><ClubActionNotice state={like.state} testID="club-like-notice" onLogin={() => router.push('/login')} /><Text role="body">{detail.summary}</Text><Button testID="club-activity-registration" label={`${t(current.registered ? 'clubs.cancelRegistration' : 'clubs.register')} · ${t('clubs.registrationCount', { n: current.count })}`} loading={registration.state === 'working'} onPress={() => void (current.registered ? registration.cancel() : registration.register())} /><ClubActionNotice state={registration.state} testID="club-activity-registration-notice" onLogin={() => router.push('/login')} />{detail.viewer.canManage ? <><Button testID="club-activity-export-registrations" label={t('clubs.exportRegistrations')} loading={exporting} onPress={() => void exportRegistrations()} />{exportFailed ? <Text role="body" colorToken="text-danger">{t('clubs.exportFailed')}</Text> : null}</> : null}{comments.body}</>}
+      body={<><ClubActionNotice state={like.state} testID="club-like-notice" onLogin={() => router.push('/login')} /><Text role="body">{detail.summary}</Text><Button testID="club-activity-registration" label={t(current.registered ? 'clubs.cancelRegistration' : 'clubs.register')} loading={registration.state === 'working'} onPress={() => void (current.registered ? registration.cancel() : registration.register())} /><Text testID="club-activity-registration-count" role="caption" colorToken="text-muted">{t('clubs.registrationCount', { n: current.count })}</Text><ClubActionNotice state={registration.state} testID="club-activity-registration-notice" onLogin={() => router.push('/login')} />{detail.viewer.canManage ? <><Button testID="club-activity-export-registrations" label={t('clubs.exportRegistrations')} loading={exporting} onPress={() => void exportRegistrations()} />{exportFailed ? <Text role="body" colorToken="text-danger">{t('clubs.exportFailed')}</Text> : null}</> : null}{comments.body}</>}
       comments={comments.comments}
       labels={detailLabels(t)}
     />
