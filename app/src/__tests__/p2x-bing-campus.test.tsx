@@ -13,6 +13,7 @@ import { act, fireEvent, waitFor, within } from '@testing-library/react-native';
 
 import { Button } from '@/components/ui/Button';
 import { CampusDetailScreen, TreeholeFeed, WallFeed } from '@/features/campus/CampusScreens';
+import { WallTemplateContent } from '@/features/campus/wallTemplates';
 import { getQueryClient } from '@/shared/queryClient';
 import { secondaryTabStore } from '@/features/navigation/secondaryTabs';
 import {
@@ -773,5 +774,19 @@ describe('万能墙删除自己的评论', () => {
     await fireEvent.press(within(view.getByTestId('wall-comment-delete-dialog')).getAllByText('删除').at(-1)!);
     await waitFor(() => expect(view.getByTestId('campus-comment-delete-notice')).toBeTruthy());
     expect(view.getByTestId('campus-detail-comments-11')).toBeTruthy();
+  });
+});
+
+describe('万能墙清单模板图标化', () => {
+  it('checklist 每行渲染方框图标，不再出现文字符号', async () => {
+    const view = await renderApp(<WallTemplateContent templateKey="checklist" content={'买水\n买咖啡'} />);
+    expect(view.queryByText(/□/)).toBeNull();
+    expect(view.getByTestId('wall-checklist-icon-0')).toBeTruthy();
+    expect(view.getByTestId('wall-checklist-icon-1')).toBeTruthy();
+  });
+
+  it('note 模板保留排版圆点', async () => {
+    const view = await renderApp(<WallTemplateContent templateKey="note" content={'一行\n两行'} />);
+    expect(view.getAllByText(/• /)).toHaveLength(2);
   });
 });
