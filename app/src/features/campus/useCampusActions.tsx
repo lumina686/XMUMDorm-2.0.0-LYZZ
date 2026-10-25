@@ -17,6 +17,7 @@ import {
   toggleConfessionLike,
   getConfessionComments,
   createConfessionComment,
+  deleteConfessionComment,
 } from '../../../../shared/api/confessions';
 import { formatPostTime } from '../../../../shared/utils/formatTime';
 import { useCampusReport, type CampusReportReason, type CampusReportState } from './useCampusReport';
@@ -59,6 +60,7 @@ function comment(
     content: string;
     author?: { nickname?: string; username?: string; avatar?: string; level?: number; badge?: string };
     created_at?: string;
+    viewer_is_mine?: boolean;
   };
   if (!Number.isSafeInteger(row.id) || row.id <= 0 || typeof row.content !== 'string') {
     throw new Error('Invalid comment');
@@ -75,6 +77,8 @@ function comment(
     parentId: parentId === null ? null : String(parentId),
     depth: parentId === null ? 0 : 1,
     content: row.content,
+    // 万能墙专属：viewer_is_mine 只回答「是不是你自己发的」，不泄露任何身份（树洞契约不同，恒 undefined）
+    canDelete: kind === 'wall' && row.viewer_is_mine === true ? true : undefined,
     // 投影层就格式化：界面不再出现 `2026-10-15T10:42:00.000Z` 这种后端原文
     createdAtLabel: typeof row.created_at === 'string' ? formatPostTime(row.created_at, { locale }) : '',
     author:
@@ -195,6 +199,9 @@ export type CampusActions = {
     error: boolean;
     retry: () => void;
     onReply: (id: string) => void;
+    /** 万能墙：删除自己的评论（乐观移除，失败回滚并置 deleteFailed） */
+    deleteComment: (id: string) => void;
+    deleteFailed: boolean;
   };
   reply: CommentNode | null;
   cancelReply: () => void;
@@ -229,7 +236,8 @@ export function useCampusActions(
   const [nodes, setNodes] = React.useState<CommentNode[]>([]),
     [draft, setDraft] = React.useState('');
   const [reply, setReply] = React.useState<CommentNode | null>(null),
-    [sending, setSending] = React.useState(false);
+    [sending, setSending] = React.useState(false),
+    [commentDeleteFailed, setCommentDeleteFailed] = React.useState(false);
   const [notice, setNotice] = React.useState<CampusNotice>(null);
   const { pagination, dispatch } = useListPagination({ initial: { hasMore: false } });
   const epoch = React.useRef(0),
@@ -255,6 +263,26 @@ export function useCampusActions(
       if (request === epoch.current) locks.current.read = false;
     }
   }, [post, kind, dispatch, t, locale]);
+
+  /** 万能墙：删自己的评论——乐观移除，失败整组回滚并提示（服务端仍是最终裁决） */
+  const deleteComment = React.useCallback(
+    async (commentId: string): Promise<void> => {
+      if (kind !== 'wall' || !post) return;
+      const snapshotNodes = nodes;
+      setCommentDeleteFailed(false);
+      setNodes((current) => current.filter((node) => node.id !== commentId));
+      try {
+        const acknowledgement = await deleteConfessionComment(post.id, Number(commentId));
+        if (!acknowledgement || typeof acknowledgement !== 'object' || (acknowledgement as { status?: unknown }).status !== 0) {
+          throw new Error('Invalid comment delete acknowledgement');
+        }
+      } catch {
+        setNodes(snapshotNodes);
+        setCommentDeleteFailed(true);
+      }
+    },
+    [kind, nodes, post]
+  );
 
   React.useEffect(() => {
     ++epoch.current;
@@ -355,6 +383,8 @@ export function useCampusActions(
         const node = nodes.find((item) => item.id === id && item.depth === 0);
         if (node) setReply(node);
       },
+      deleteComment: (id: string) => void deleteComment(id),
+      deleteFailed: commentDeleteFailed,
     },
     reply,
     cancelReply: () => setReply(null),

@@ -37,6 +37,8 @@ export const zh = {
   'screen.campus.read.report': '举报',
   'screen.campus.read.delete': '删除',
   'screen.campus.read.deleteBody': '删除后无法恢复，确定删除这篇投稿吗？',
+  'screen.campus.read.deleteCommentBody': '删除后无法恢复，确定删除这条评论吗？',
+  'screen.campus.read.deleteCommentFailed': '评论删除未完成，已恢复显示：检查网络后再试一次',
   'screen.campus.read.deleteFailed': '删除未完成，帖子仍在：检查网络后再试，或返回列表刷新',
   'screen.campus.read.reply': '回复',
   'screen.campus.read.collapse': '收起',

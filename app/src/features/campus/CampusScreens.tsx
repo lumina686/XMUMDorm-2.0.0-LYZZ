@@ -107,6 +107,7 @@ export function CampusDetailScreen({
   const [reportDetail, setReportDetail] = React.useState('');
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [deleteError, setDeleteError] = React.useState(false);
+  const [deleteCommentId, setDeleteCommentId] = React.useState<string | null>(null);
   const scrollRef = React.useRef<ScrollView | null>(null);
   const generation = React.useRef(0);
 
@@ -366,6 +367,14 @@ export function CampusDetailScreen({
               <Text role="label" emphasis="strong" colorToken="text-primary">
                 {t('screen.campus.read.commentsCount', { count: commentCount })}
               </Text>
+              {actions.comments.deleteFailed ? (
+                <InlineNotice
+                  testID="campus-comment-delete-notice"
+                  tone="danger"
+                  message={t('screen.campus.read.deleteCommentFailed')}
+                  style={{ marginTop: theme.space('space_2') }}
+                />
+              ) : null}
             </View>
 
             <View style={{ paddingHorizontal: theme.space('space_4') }}>
@@ -388,6 +397,7 @@ export function CampusDetailScreen({
                   testID="campus-detail-comments"
                   nodes={actions.comments.nodes}
                   onReply={actions.comments.onReply}
+                  onDelete={kind === 'wall' ? (id: string) => setDeleteCommentId(id) : undefined}
                   labels={{
                     anonymous: t('screen.campus.read.anonymous'),
                     deleteLabel: t('screen.campus.read.delete'),
@@ -466,6 +476,21 @@ export function CampusDetailScreen({
               cancelLabel={t('action.cancel')}
               onCancel={() => setDeleteOpen(false)}
               onConfirm={() => { void removeWallPost(); }}
+            />
+            <AlertDialog
+              testID="wall-comment-delete-dialog"
+              visible={deleteCommentId !== null}
+              variant="danger"
+              title={t('screen.campus.read.delete')}
+              body={t('screen.campus.read.deleteCommentBody')}
+              confirmLabel={t('screen.campus.read.delete')}
+              cancelLabel={t('action.cancel')}
+              onCancel={() => setDeleteCommentId(null)}
+              onConfirm={() => {
+                const id = deleteCommentId;
+                setDeleteCommentId(null);
+                if (id !== null) actions.comments.deleteComment(id);
+              }}
             />
           </ScrollView>
         ) : state === 'loading' ? (
