@@ -1,7 +1,6 @@
 import * as React from 'react';
 
-import {useSession} from '@/features/auth/session';
-import {classifyAuthFailure, isSessionInvalid} from '@/features/auth/authFailure';
+import {useClubAction} from './useClubAction';
 import {cancelClubActivityRegistration, registerClubActivity} from '../../../../shared/api/clubs';
 
 export type ClubActivityRegistration = {
@@ -48,52 +47,31 @@ export function useClubActivityRegistration(activityId: number | null): {
   register: () => Promise<void>;
   cancel: () => Promise<void>;
 } {
-  const session = useSession();
   const [snapshot, setSnapshot] = React.useState<ClubActivityRegistration | null>(null);
-  const [state, setState] = React.useState<ClubActivityRegistrationState>('idle');
-  const epoch = React.useRef(0);
-  const locked = React.useRef(false);
+  const action = useClubAction<'register' | 'cancel', ClubActivityRegistrationState>({
+    request: (act) => (act === 'register' ? registerClubActivity(activityId as number) : cancelClubActivityRegistration(activityId as number)),
+    apply: (value) => {
+      const next = readRegistration(value, activityId as number);
+      setSnapshot(next);
+      return next.registered ? 'registered' : 'cancelled';
+    },
+  });
 
   React.useEffect(() => {
-    epoch.current += 1;
-    locked.current = false;
+    action.reset();
     setSnapshot(null);
-    setState('idle');
-    return () => { epoch.current += 1; };
+    return () => { action.reset(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activityId]);
 
-  const update = React.useCallback(async (action: 'register' | 'cancel'): Promise<void> => {
-    if (typeof activityId !== 'number' || !Number.isSafeInteger(activityId) || activityId <= 0 || locked.current) return;
-    if (!session.isSignedIn) {
-      setState('login');
-      return;
-    }
-    const currentActivityId = activityId;
-    const request = epoch.current;
-    locked.current = true;
-    setState('working');
-    try {
-      const value = action === 'register'
-        ? await registerClubActivity(currentActivityId)
-        : await cancelClubActivityRegistration(currentActivityId);
-      const next = readRegistration(value, currentActivityId);
-      if (request !== epoch.current) return;
-      setSnapshot(next);
-      setState(next.registered ? 'registered' : 'cancelled');
-    } catch (error) {
-      if (request !== epoch.current) return;
-      const failure = classifyAuthFailure(error);
-      if (isSessionInvalid(failure)) await session.handleAuthFailure(error);
-      if (request !== epoch.current) return;
-      setState(isSessionInvalid(failure) ? 'login' : failure === 'sanctioned' ? 'denied' : 'failed');
-    } finally {
-      if (request === epoch.current) locked.current = false;
-    }
-  }, [activityId, session]);
+  const update = React.useCallback(async (act: 'register' | 'cancel'): Promise<void> => {
+    if (typeof activityId !== 'number' || !Number.isSafeInteger(activityId) || activityId <= 0) return;
+    await action.perform(act);
+  }, [action, activityId]);
 
   return {
     snapshot,
-    state,
+    state: action.state,
     register: () => update('register'),
     cancel: () => update('cancel'),
   };
