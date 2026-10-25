@@ -626,7 +626,6 @@ export const en: Record<MessageKey, string> = {
   'clubs.removeMemberBody': 'They must join again to return',
   'clubs.deleteActivity': 'Delete activity',
   'clubs.deletePost': 'Delete post',
-  'clubs.actionFailed': 'Action was not completed. Retry.',
   'clubs.notice.login': 'Not signed in: sign in to continue',
   'clubs.notice.denied': 'Your account is restricted and the action was refused; contact an administrator if you have questions',
   'clubs.notice.failed': 'Unstable network, the action did not take effect; check your connection and try again',

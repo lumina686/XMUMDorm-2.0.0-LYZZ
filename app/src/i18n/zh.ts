@@ -634,7 +634,6 @@ export const zh = {
   'clubs.removeMemberBody': '移除后需重新加入',
   'clubs.deleteActivity': '删除活动',
   'clubs.deletePost': '删除动态',
-  'clubs.actionFailed': '操作未完成，请重试',
   'clubs.notice.login': '尚未登录：登录后才能继续这一操作',
   'clubs.notice.denied': '账号当前受限，该操作被拒绝；如有疑问请联系管理员',
   'clubs.notice.failed': '网络不稳定，这次操作没有生效；检查网络后再试一次',

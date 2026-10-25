@@ -267,7 +267,7 @@ export function ClubManageScreen({ clubId }: { clubId: string }): React.ReactEle
   const [loading, setLoading] = React.useState(id !== null);
   const [error, setError] = React.useState<ReturnType<typeof appError> | null>(id === null ? { kind: 'content' } : null);
   const [removing, setRemoving] = React.useState<ClubProfile['members'][number] | null>(null);
-  const [actionError, setActionError] = React.useState(false);
+  const [actionError, setActionError] = React.useState<ClubActionNoticeState | null>(null);
   const load = React.useCallback(async () => {
     if (id === null) return;
     setLoading(true); setError(null);
@@ -278,12 +278,15 @@ export function ClubManageScreen({ clubId }: { clubId: string }): React.ReactEle
   React.useEffect(() => { void load(); }, [load]);
   const back = (): void => router.replace(id === null ? '/clubs' as never : `/clubs/${id}` as never);
   const mutate = async (operation: () => Promise<unknown>): Promise<void> => {
-    setActionError(false);
+    setActionError(null);
     try {
       const acknowledgement = await operation();
       if (!acknowledgement || typeof acknowledgement !== 'object' || (acknowledgement as { status?: unknown }).status !== 0) throw new Error('Invalid management acknowledgement');
       await load();
-    } catch { setActionError(true); }
+    } catch (cause) {
+      const failure = classifyAuthFailure(cause);
+      setActionError(isSessionInvalid(failure) ? 'login' : failure === 'sanctioned' ? 'denied' : 'failed');
+    }
   };
   if (id === null) {
     return <Screen titleKey="clubs.manage" showMailbox={false} testID="club-manage-unavailable"><EmptyState kind="noResult" title={t('clubs.unavailable')} actionLabel={t('clubs.back')} onAction={back} /></Screen>;
@@ -302,7 +305,7 @@ export function ClubManageScreen({ clubId }: { clubId: string }): React.ReactEle
     <Screen titleKey="clubs.manage" showMailbox={false} testID="club-manage">
       <View style={{ gap: theme.space('space_3') }}>
         <Text role="title" emphasis="strong">{managedProfile.basicInfo.name}</Text>
-        {actionError ? <Text role="body" colorToken="text-danger">{t('clubs.actionFailed')}</Text> : null}
+        {actionError ? <ClubActionNotice state={actionError} testID="club-manage-notice" onLogin={() => router.push('/login')} /> : null}
         <Text role="headline">{t('clubs.members', { n: managedProfile.members.length })}</Text>
         {managedProfile.members.map((member) => <View key={member.id} style={{ gap: theme.space('space_1') }}><Text role="body">{member.nickname}</Text>{member.role === 'member' ? <Button testID={`club-manage-remove-${member.id}`} label={t('clubs.removeMember')} variant="danger" onPress={() => setRemoving(member)} /> : null}</View>)}
         {activities.map((activity) => <Button key={activity.id} label={`${t('clubs.deleteActivity')} · ${activity.title}`} variant="danger" onPress={() => void mutate(() => deleteClubActivity(activity.id))} />)}
