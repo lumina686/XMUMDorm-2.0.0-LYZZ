@@ -20,7 +20,7 @@ const authenticateToken = require('../middleware/auth');
 const { checkSanction } = require('../middleware/checkSanction');
 const sensitiveWordFilter = require('../middleware/sensitiveWordFilter');
 const { createNotification, createNotificationBatch } = require('../services/notificationService');
-const jwt = require('jsonwebtoken');
+const { parseOptionalUser } = require('../utils/parseOptionalUser');
 const { assetUrl } = require('../utils/assets');
 const { uploadBuffer, isObjectStorageConfigured } = require('../services/objectStorage');
 const { prepareImageUpload } = require('../services/imageProcessing');
@@ -31,17 +31,6 @@ const ExcelJS = require('exceljs');
 
 const CLUB_CATEGORIES = new Set(['music', 'tech', 'culture', 'sport', 'art']);
 const ACTIVITY_STATUS = new Set(['upcoming', 'ongoing', 'ended']);
-
-function parseOptionalUser(req) {
-  if (!req.headers.authorization) return null;
-  try {
-    const token = (req.headers.authorization || '').split(' ')[1];
-    if (!token) return null;
-    return jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-change-in-production');
-  } catch (_) {
-    return null;
-  }
-}
 
 function viewerIsSiteAdmin(viewer) {
   return !!(viewer && String(viewer.role || '') === 'admin');

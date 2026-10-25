@@ -21,6 +21,7 @@ const { attachExp } = require('../utils/expResponse');
 const { isPostContentEligible, isCommentEligible } = require('../utils/expEligibility');
 const { requireCurrentTerms } = require('../services/termsAcceptance');
 const { inlineLimit } = require('../utils/sqlLimit');
+const { parseOptionalUser } = require('../utils/parseOptionalUser');
 const { POST_CONTENT_ORIGINS, normalizePostRepostSource } = require('../shared/constants/postAttribution');
 
 // 统一的文本清洗，防止 XSS 注入（去掉所有 HTML 标签，只保留纯文本）
@@ -36,19 +37,6 @@ function cleanText(input) {
 // 辅助：当前用户是否为 admin
 function isAdmin(req) {
   return req.user && req.user.role === 'admin';
-}
-
-/** 从 Authorization 解析用户（可选，不抛错） */
-function parseOptionalUser(req) {
-  if (!req.headers.authorization) return null;
-  try {
-    const jwt = require('jsonwebtoken');
-    const token = (req.headers.authorization || '').split(' ')[1];
-    if (!token) return null;
-    return jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-change-in-production');
-  } catch (_) {
-    return null;
-  }
 }
 
 /** 生成 URL slug（拉丁字母与数字） */
