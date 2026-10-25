@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { waitFor } from '@testing-library/react-native';
+import { fireEvent, waitFor, within } from '@testing-library/react-native';
 
 import { renderApp } from './helpers/renderApp';
 
@@ -82,5 +82,31 @@ describe('P3A5-02 社团发现与主页', () => {
     const user = require('@testing-library/react-native').userEvent.setup();
     await user.press(view.getByTestId('club-profile-back'));
     expect(routerState.replaced).toEqual(['/clubs']);
+  });
+
+  it('未登录点关注出现登录引导，点击前往登录', async () => {
+    api.getClubProfile.mockResolvedValue(PROFILE);
+    follow.mockReturnValue({ following: false, followers: 3, state: 'login', toggle: jest.fn() });
+    const view = await renderApp(<ClubProfileScreen clubId="7" />);
+
+    await waitFor(() => expect(view.getByTestId('club-profile-follow-notice')).toBeTruthy());
+    fireEvent.press(within(view.getByTestId('club-profile-follow-notice')).getByText('登录'));
+    expect(routerState.pushed).toEqual(['/login']);
+  });
+
+  it('关注失败出现可读的原因提示', async () => {
+    api.getClubProfile.mockResolvedValue(PROFILE);
+    follow.mockReturnValue({ following: false, followers: 3, state: 'failed', toggle: jest.fn() });
+    const view = await renderApp(<ClubProfileScreen clubId="7" />);
+
+    await waitFor(() => expect(view.getByTestId('club-profile-follow-notice')).toBeTruthy());
+  });
+
+  it('空闲态不渲染任何关注提示', async () => {
+    api.getClubProfile.mockResolvedValue(PROFILE);
+    const view = await renderApp(<ClubProfileScreen clubId="7" />);
+
+    await waitFor(() => expect(view.getByTestId('club-profile-follow')).toBeTruthy());
+    expect(view.queryByTestId('club-profile-follow-notice')).toBeNull();
   });
 });
