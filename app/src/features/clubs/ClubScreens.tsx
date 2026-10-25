@@ -108,14 +108,17 @@ export function ClubDiscoveryScreen({ embedded = false }: { embedded?: boolean }
   const [rows, setRows] = React.useState<readonly ClubSummary[]>([]);
   const page = React.useRef(0);
   const pending = React.useRef(false);
+  const generation = React.useRef(0);
   const [queryInput, setQueryInput] = React.useState('');
   const query = React.useRef('');
   const [category, setCategory] = React.useState<ClubCategory | null>(null);
   const categoryRef = React.useRef<ClubCategory | null>(null);
 
   const load = React.useCallback(async (mode: 'refresh' | 'append') => {
-    if (pending.current || (mode === 'append' && !pagination.hasMore)) return;
-    pending.current = true;
+    if (mode === 'append' && (pending.current || !pagination.hasMore)) return;
+    // refresh 永远放行并作废旧请求；pending 只防翻页重复（对齐食堂检索的竞争丢弃）
+    const issue = ++generation.current;
+    if (mode === 'append') pending.current = true;
     const nextPage = mode === 'refresh' ? 1 : page.current + 1;
     dispatch({ type: mode === 'refresh' ? 'refresh:start' : 'append:start' });
     try {
@@ -125,6 +128,7 @@ export function ClubDiscoveryScreen({ embedded = false }: { embedded?: boolean }
         ...(query.current ? { q: query.current } : {}),
         ...(categoryRef.current ? { category: categoryRef.current } : {}),
       }));
+      if (issue !== generation.current) return;
       page.current = nextPage;
       setRows((current) => {
         if (mode === 'refresh') return data.rows;
@@ -132,9 +136,9 @@ export function ClubDiscoveryScreen({ embedded = false }: { embedded?: boolean }
       });
       dispatch({ type: mode === 'refresh' ? 'refresh:success' : 'append:success', hasMore: data.hasMore });
     } catch (error) {
-      dispatch({ type: mode === 'refresh' ? 'refresh:failure' : 'append:failure', error: appError(error) });
+      if (issue === generation.current) dispatch({ type: mode === 'refresh' ? 'refresh:failure' : 'append:failure', error: appError(error) });
     } finally {
-      pending.current = false;
+      if (issue === generation.current) pending.current = false;
     }
   }, [dispatch, pagination.hasMore]);
 
