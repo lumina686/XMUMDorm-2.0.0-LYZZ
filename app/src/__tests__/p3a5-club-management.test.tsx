@@ -96,8 +96,8 @@ describe('P3A5-04 我的社团与管理入口', () => {
     const view = await renderApp(<ClubManageScreen clubId="7" />);
 
     await waitFor(() => expect(view.getByTestId('club-manage-invite-input')).toBeTruthy());
-    fireEvent.changeText(view.getByTestId('club-manage-invite-input'), 'new@example.com');
-    fireEvent.press(view.getByTestId('club-manage-invite'));
+    await fireEvent.changeText(view.getByTestId('club-manage-invite-input'), 'new@example.com');
+    await fireEvent.press(view.getByTestId('club-manage-invite'));
     await waitFor(() => expect(api.addClubMember).toHaveBeenCalledWith(7, 'new@example.com', 'member'));
     await waitFor(() => expect(api.getClubProfile).toHaveBeenCalledTimes(2));
   });
@@ -117,8 +117,8 @@ describe('P3A5-04 我的社团与管理入口', () => {
     const view = await renderApp(<ClubManageScreen clubId="7" />);
 
     await waitFor(() => expect(view.getByTestId('club-manage-invite-input')).toBeTruthy());
-    fireEvent.changeText(view.getByTestId('club-manage-invite-input'), 'new@example.com');
-    fireEvent.press(view.getByTestId('club-manage-invite'));
+    await fireEvent.changeText(view.getByTestId('club-manage-invite-input'), 'new@example.com');
+    await fireEvent.press(view.getByTestId('club-manage-invite'));
     await waitFor(() => expect(view.getByTestId('club-manage-notice')).toBeTruthy());
     expect(api.getClubProfile).toHaveBeenCalledTimes(1);
   });
