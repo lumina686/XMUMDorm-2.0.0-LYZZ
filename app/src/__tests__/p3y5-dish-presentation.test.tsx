@@ -27,7 +27,8 @@ it('renders the actions bar in the screen footer slot, outside the scrolling con
   expect(within(view.getByTestId('dish-scroll')).queryByTestId('dish-actions-footer')).toBeNull();
   expect(view.queryByTestId('dish-actions-overlay')).toBeNull();
   const scrollStyle = StyleSheet.flatten(view.getByTestId('dish-scroll').props.contentContainerStyle);
-  expect(scrollStyle.paddingBottom).toBe(scrollStyle.padding);
+  expect(scrollStyle.paddingBottom).toBeUndefined();
+  expect(scrollStyle.padding).toBeTruthy();
   expect(view.getByTestId('dish-images-placeholder')).toBeTruthy();
 });
 it('uses one image entry until the review limit and enables it again after removal', async () => {
