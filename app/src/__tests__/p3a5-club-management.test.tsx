@@ -150,6 +150,15 @@ describe('P3A5-04 我的社团与管理入口', () => {
     expect(view.getByTestId('club-manage-invite-input').props.value).toBe('ghost@example.com');
   });
 
+  it('管理页删除按钮只留动作词，对象名在行文本', async () => {
+    api.getClubProfile.mockResolvedValue({ ...PROFILE, posts: [{ id: 12, content: '某条动态' }], activities: [{ id: 5, title: '秋季招新' }] });
+    const view = await renderApp(<ClubManageScreen clubId="7" />);
+
+    await waitFor(() => expect(view.getByText('某条动态')).toBeTruthy());
+    expect(view.getByTestId('club-manage-delete-post-12').props.label).toBe('删除动态');
+    expect(view.getByTestId('club-manage-delete-activity-5').props.label).toBe('删除活动');
+  });
+
   it('成员列表显示角色标签', async () => {
     api.getClubProfile.mockResolvedValue(PROFILE);
     const view = await renderApp(<ClubManageScreen clubId="7" />);

@@ -54,7 +54,8 @@ describe('P3A5-03 社团详情接线', () => {
     const view = await renderApp(<ClubActivityDetailScreen activityId="9" />);
 
     await waitFor(() => expect(view.getByTestId('club-activity-registration')).toBeTruthy());
-    expect(view.getByTestId('club-activity-registration').props.accessibilityLabel).toContain('8');
+    expect(view.getByTestId('club-activity-registration').props.accessibilityLabel).not.toContain('8');
+    expect(view.getByTestId('club-activity-registration-count').props.children).toContain('8');
     const user = require('@testing-library/react-native').userEvent.setup();
     await user.press(view.getByTestId('club-activity-registration'));
     expect(registration.mock.results[0].value.cancel).toHaveBeenCalledTimes(1);

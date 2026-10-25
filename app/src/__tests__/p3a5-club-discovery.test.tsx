@@ -167,6 +167,17 @@ describe('P3A5-02 社团发现与主页', () => {
     await waitFor(() => expect(api.listClubs).toHaveBeenCalledWith(expect.objectContaining({ page: 2, category: 'music' })));
   });
 
+  it('主页帖子行不再把全文当按钮 label，且仍可点进详情', async () => {
+    const LONG = '这是一条非常非常长的社团动态内容，用来验证按钮文案收敛后不再被全文撑爆。';
+    api.getClubProfile.mockResolvedValue({ ...PROFILE, posts: [{ id: 12, content: LONG }] });
+    const view = await renderApp(<ClubProfileScreen clubId="7" />);
+
+    await waitFor(() => expect(view.getByTestId('club-profile-post-12')).toBeTruthy());
+    expect(view.getByTestId('club-profile-post-12').props.accessibilityLabel).not.toBe(LONG);
+    await fireEvent.press(view.getByTestId('club-profile-post-12'));
+    expect(routerState.pushed).toEqual(['/clubs/post/12']);
+  });
+
   it('迟到的未筛选响应不覆盖已筛选列表', async () => {
     let resolveFirst: (value: unknown) => void = () => undefined;
     api.listClubs.mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }));
