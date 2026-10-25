@@ -65,4 +65,28 @@ describe('P3A5-04 我的社团与管理入口', () => {
     await waitFor(() => expect(api.removeClubMember).toHaveBeenCalledWith(7, 2));
     expect(api.getClubProfile).toHaveBeenCalledTimes(2);
   });
+
+  it('管理操作网络失败显示原因与补救，而不是笼统重试', async () => {
+    api.getClubProfile.mockResolvedValue({ ...PROFILE, activities: [{ id: 5, title: 'Jam' }] });
+    api.deleteClubActivity.mockRejectedValue(new TypeError('Network request failed'));
+    const view = await renderApp(<ClubManageScreen clubId="7" />);
+
+    await waitFor(() => expect(view.getByText('删除活动 · Jam')).toBeTruthy());
+    const user = require('@testing-library/react-native').userEvent.setup();
+    await user.press(view.getByText('删除活动 · Jam'));
+    await waitFor(() => expect(view.getByTestId('club-manage-notice')).toBeTruthy());
+    expect(within(view.getByTestId('club-manage-notice')).getByText(/网络不稳定/)).toBeTruthy();
+  });
+
+  it('管理操作被处罚拒绝时显示受限提示', async () => {
+    api.getClubProfile.mockResolvedValue({ ...PROFILE, activities: [{ id: 5, title: 'Jam' }] });
+    api.deleteClubActivity.mockRejectedValue({ status: 403, body: { muted: true } });
+    const view = await renderApp(<ClubManageScreen clubId="7" />);
+
+    await waitFor(() => expect(view.getByText('删除活动 · Jam')).toBeTruthy());
+    const user = require('@testing-library/react-native').userEvent.setup();
+    await user.press(view.getByText('删除活动 · Jam'));
+    await waitFor(() => expect(view.getByTestId('club-manage-notice')).toBeTruthy());
+    expect(within(view.getByTestId('club-manage-notice')).getByText(/受限/)).toBeTruthy();
+  });
 });
