@@ -30,6 +30,7 @@ import {
   createConfessionComment,
   toggleConfessionLike,
   deleteConfession,
+  deleteConfessionComment,
 } from '../../../shared/api/confessions';
 import type { ListScreenProps } from '@/components/ui/ListScreen';
 import { renderApp } from './helpers/renderApp';
@@ -727,5 +728,50 @@ describe('万能墙删除自己的帖子', () => {
     await fireEvent.press(within(view.getByTestId('wall-delete-dialog')).getAllByText('删除').at(-1)!);
     await waitFor(() => expect(view.getByTestId('wall-delete-notice')).toBeTruthy());
     expect(routerMock.back).not.toHaveBeenCalled();
+  });
+});
+
+describe('万能墙删除自己的评论', () => {
+  const wallComments = getConfessionComments as jest.Mock;
+  const removeComment = deleteConfessionComment as jest.Mock;
+  const OWN_AND_OTHER = [
+    { id: 11, parent_id: null, content: '我的评论', author: { display_name: '匿名', display_name_en: 'Anonymous' }, viewer_is_mine: true, created_at: '2026-10-15T02:42:00.000Z' },
+    { id: 12, parent_id: null, content: '别人的评论', author: { display_name: '匿名', display_name_en: 'Anonymous' }, viewer_is_mine: false, created_at: '2026-10-15T02:42:00.000Z' },
+  ];
+
+  it('自己的评论有删除动作，别人的没有', async () => {
+    wallDetail.mockResolvedValue({ id: 40, content: '正文', template_key: 'announcement' });
+    wallComments.mockResolvedValue(OWN_AND_OTHER);
+    const view = await renderApp(<CampusDetailScreen postId="40" kind="wall" />);
+
+    await waitFor(() => expect(view.getByText('我的评论')).toBeTruthy());
+    expect(within(view.getByTestId('campus-detail-comments-11')).getByText('删除')).toBeTruthy();
+    expect(within(view.getByTestId('campus-detail-comments-12')).queryByText('删除')).toBeNull();
+  });
+
+  it('确认后删除评论，节点消失', async () => {
+    wallDetail.mockResolvedValue({ id: 40, content: '正文', template_key: 'announcement' });
+    wallComments.mockResolvedValue(OWN_AND_OTHER);
+    removeComment.mockResolvedValue({ status: 0 });
+    const view = await renderApp(<CampusDetailScreen postId="40" kind="wall" />);
+
+    await waitFor(() => expect(view.getByText('我的评论')).toBeTruthy());
+    await fireEvent.press(within(view.getByTestId('campus-detail-comments-11')).getByText('删除'));
+    await fireEvent.press(within(view.getByTestId('wall-comment-delete-dialog')).getAllByText('删除').at(-1)!);
+    await waitFor(() => expect(removeComment).toHaveBeenCalledWith(40, 11));
+    await waitFor(() => expect(view.queryByTestId('campus-detail-comments-11')).toBeNull());
+  });
+
+  it('删除评论失败节点恢复并提示', async () => {
+    wallDetail.mockResolvedValue({ id: 40, content: '正文', template_key: 'announcement' });
+    wallComments.mockResolvedValue(OWN_AND_OTHER);
+    removeComment.mockRejectedValue(new TypeError('Network request failed'));
+    const view = await renderApp(<CampusDetailScreen postId="40" kind="wall" />);
+
+    await waitFor(() => expect(view.getByText('我的评论')).toBeTruthy());
+    await fireEvent.press(within(view.getByTestId('campus-detail-comments-11')).getByText('删除'));
+    await fireEvent.press(within(view.getByTestId('wall-comment-delete-dialog')).getAllByText('删除').at(-1)!);
+    await waitFor(() => expect(view.getByTestId('campus-comment-delete-notice')).toBeTruthy());
+    expect(view.getByTestId('campus-detail-comments-11')).toBeTruthy();
   });
 });
