@@ -333,6 +333,40 @@ describe('Clubs member removal', () => {
   });
 });
 
+describe('Clubs member invites', () => {
+  beforeEach(() => {
+    mockUser.id = 9;
+    mockUser.role = 'student';
+    query.mockReset();
+  });
+
+  it('does not let a regular member invite anyone', async () => {
+    query.mockResolvedValueOnce([]);
+
+    const res = await supertest(app())
+      .post('/api/clubs/8/members')
+      .send({ email: 'someone@example.com', role: 'member' });
+
+    expect(res.status).toBe(403);
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
+  it('upserts the role when a club administrator invites', async () => {
+    query
+      .mockResolvedValueOnce([{role: 'admin'}])
+      .mockResolvedValueOnce([{id: 22}])
+      .mockResolvedValueOnce({affectedRows: 1});
+
+    const res = await supertest(app())
+      .post('/api/clubs/8/members')
+      .send({ email: 'someone@example.com', role: 'admin' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe(0);
+    expect(query.mock.calls[2][0]).toContain('ON DUPLICATE KEY UPDATE role');
+  });
+});
+
 describe('Clubs content list pagination', () => {
   beforeEach(() => {
     mockUser.id = 9;

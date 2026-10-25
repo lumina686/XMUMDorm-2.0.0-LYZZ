@@ -47,6 +47,8 @@ describe('P3A5-04 我的社团与管理入口', () => {
 
     await waitFor(() => expect(view.getByTestId('club-manage-denied')).toBeTruthy());
     expect(view.queryByTestId('club-manage-remove-2')).toBeNull();
+    expect(view.queryByTestId('club-manage-invite-input')).toBeNull();
+    expect(view.queryByTestId('club-manage-invite')).toBeNull();
     const user = require('@testing-library/react-native').userEvent.setup();
     await user.press(view.getByTestId('club-manage-back'));
     expect(routerState.replaced).toEqual(['/clubs/7']);
