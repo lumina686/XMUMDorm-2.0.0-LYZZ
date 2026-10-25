@@ -7,19 +7,22 @@ import { Button } from '@/components/ui/Button';
 import { AlertDialog } from '@/components/ui/AlertDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { FilterChips } from '@/components/ui/FilterChips';
 import { InlineNotice } from '@/components/ui/InlineNotice';
 import { Input } from '@/components/ui/Input';
 import { ListScreen, useListPagination } from '@/components/ui/ListScreen';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { MediaGrid } from '@/components/ui/MediaGrid';
 import { Screen } from '@/components/ui/Screen';
+import { SearchField } from '@/components/ui/SearchField';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Text } from '@/components/ui/Text';
 import { useTheme } from '@/design-system/theme';
 import { useI18n } from '@/i18n';
+import type { MessageKey } from '@/i18n';
 import { DetailScreen } from '@/proto/P3';
 import { addClubMember, deleteClubActivity, deleteClubPost, getActivityDetail, getClubPostDetail, getClubProfile, listClubs, listMyClubs, removeClubMember } from '../../../../shared/api/clubs';
-import { readClubActivityDetail, readClubPage, readClubPostDetail, readClubProfile, type ClubActivityDetail, type ClubPostDetail, type ClubProfile, type ClubSummary } from './model';
+import { readClubActivityDetail, readClubPage, readClubPostDetail, readClubProfile, CLUB_CATEGORIES, type ClubActivityDetail, type ClubCategory, type ClubPostDetail, type ClubProfile, type ClubSummary } from './model';
 import { useClubActivityRegistration, type ClubActivityRegistrationState } from './useClubActivityRegistration';
 import { useClubComments } from './useClubComments';
 import { exportClubActivityRegistrationsToDevice } from './exportRegistrations';
@@ -90,6 +93,14 @@ function readMyClubs(value: unknown): readonly MyClub[] {
   });
 }
 
+const CATEGORY_LABELS: Record<ClubCategory, MessageKey> = {
+  music: 'clubs.category.music',
+  tech: 'clubs.category.tech',
+  culture: 'clubs.category.culture',
+  sport: 'clubs.category.sport',
+  art: 'clubs.category.art',
+};
+
 export function ClubDiscoveryScreen({ embedded = false }: { embedded?: boolean } = {}): React.ReactElement {
   const router = useRouter();
   const { t } = useI18n();
@@ -97,6 +108,10 @@ export function ClubDiscoveryScreen({ embedded = false }: { embedded?: boolean }
   const [rows, setRows] = React.useState<readonly ClubSummary[]>([]);
   const page = React.useRef(0);
   const pending = React.useRef(false);
+  const [queryInput, setQueryInput] = React.useState('');
+  const query = React.useRef('');
+  const [category, setCategory] = React.useState<ClubCategory | null>(null);
+  const categoryRef = React.useRef<ClubCategory | null>(null);
 
   const load = React.useCallback(async (mode: 'refresh' | 'append') => {
     if (pending.current || (mode === 'append' && !pagination.hasMore)) return;
@@ -104,7 +119,12 @@ export function ClubDiscoveryScreen({ embedded = false }: { embedded?: boolean }
     const nextPage = mode === 'refresh' ? 1 : page.current + 1;
     dispatch({ type: mode === 'refresh' ? 'refresh:start' : 'append:start' });
     try {
-      const data = readClubPage(await listClubs({ page: nextPage, pageSize: 20 }));
+      const data = readClubPage(await listClubs({
+        page: nextPage,
+        pageSize: 20,
+        ...(query.current ? { q: query.current } : {}),
+        ...(categoryRef.current ? { category: categoryRef.current } : {}),
+      }));
       page.current = nextPage;
       setRows((current) => {
         if (mode === 'refresh') return data.rows;
@@ -122,8 +142,45 @@ export function ClubDiscoveryScreen({ embedded = false }: { embedded?: boolean }
     void load('refresh');
   }, [load]);
 
+  const submitQuery = (): void => {
+    const next = queryInput.trim();
+    if (next === query.current) return;
+    query.current = next;
+    void load('refresh');
+  };
+
+  const changeQueryInput = (next: string): void => {
+    setQueryInput(next);
+    if (next === '' && query.current !== '') {
+      query.current = '';
+      void load('refresh');
+    }
+  };
+
+  const toggleCategory = (key: string): void => {
+    const next = categoryRef.current === key ? null : (CLUB_CATEGORIES.includes(key as ClubCategory) ? (key as ClubCategory) : null);
+    categoryRef.current = next;
+    setCategory(next);
+    void load('refresh');
+  };
+
   return (
     <FeatureScreen embedded={embedded} titleKey="clubs.title" showMailbox={false} testID="clubs-screen">
+      <SearchField
+        testID="club-search"
+        value={queryInput}
+        onChangeText={changeQueryInput}
+        onSubmit={submitQuery}
+        placeholder={t('clubs.search.placeholder')}
+      />
+      <FilterChips
+        testID="club-filter"
+        itemTestIDPrefix="club-filter-chip"
+        options={CLUB_CATEGORIES.map((key) => ({ key, labelKey: CATEGORY_LABELS[key] }))}
+        selected={category ? [category] : []}
+        onToggle={toggleCategory}
+        onClear={() => toggleCategory(category ?? '')}
+      />
       <ListScreen
         testID="club-list"
         data={rows}
