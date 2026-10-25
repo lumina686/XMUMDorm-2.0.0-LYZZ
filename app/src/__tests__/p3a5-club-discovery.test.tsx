@@ -109,4 +109,34 @@ describe('P3A5-02 社团发现与主页', () => {
     await waitFor(() => expect(view.getByTestId('club-profile-follow')).toBeTruthy());
     expect(view.queryByTestId('club-profile-follow-notice')).toBeNull();
   });
+
+  it('关键词提交后随列表请求透传', async () => {
+    api.listClubs.mockResolvedValue({ list: [CLUB], page: 1, pageSize: 20, hasMore: false });
+    const view = await renderApp(<ClubDiscoveryScreen />);
+
+    await waitFor(() => expect(view.getByTestId('club-list-row-7')).toBeTruthy());
+    api.listClubs.mockClear();
+    await fireEvent.changeText(view.getByTestId('club-search-input'), 'music');
+    await fireEvent(view.getByTestId('club-search-input'), 'submitEditing');
+    await waitFor(() => expect(api.listClubs).toHaveBeenCalledWith(expect.objectContaining({ q: 'music' })));
+  });
+
+  it('分类筛选与关键词可组合，清除后回到未过滤', async () => {
+    api.listClubs.mockResolvedValue({ list: [CLUB], page: 1, pageSize: 20, hasMore: false });
+    const view = await renderApp(<ClubDiscoveryScreen />);
+
+    await waitFor(() => expect(view.getByTestId('club-filter-chip-music')).toBeTruthy());
+    api.listClubs.mockClear();
+    await fireEvent.press(view.getByTestId('club-filter-chip-music'));
+    await waitFor(() => expect(api.listClubs).toHaveBeenCalledWith(expect.objectContaining({ category: 'music' })));
+
+    api.listClubs.mockClear();
+    await fireEvent.changeText(view.getByTestId('club-search-input'), 'choir');
+    await fireEvent(view.getByTestId('club-search-input'), 'submitEditing');
+    await waitFor(() => expect(api.listClubs).toHaveBeenCalledWith(expect.objectContaining({ q: 'choir', category: 'music' })));
+
+    api.listClubs.mockClear();
+    await fireEvent.press(view.getByTestId('club-search-clear'));
+    await waitFor(() => expect(api.listClubs).toHaveBeenCalledWith(expect.not.objectContaining({ q: 'choir' })));
+  });
 });
