@@ -122,4 +122,38 @@ describe('P3A5-04 我的社团与管理入口', () => {
     await waitFor(() => expect(view.getByTestId('club-manage-notice')).toBeTruthy());
     expect(api.getClubProfile).toHaveBeenCalledTimes(1);
   });
+
+  it('选管理员后邀请按 admin 角色提交', async () => {
+    api.getClubProfile.mockResolvedValue(PROFILE);
+    api.addClubMember.mockResolvedValue({ status: 0 });
+    const view = await renderApp(<ClubManageScreen clubId="7" />);
+
+    await waitFor(() => expect(view.getByTestId('club-manage-invite-role-admin')).toBeTruthy());
+    await fireEvent.changeText(view.getByTestId('club-manage-invite-input'), 'new@example.com');
+    await fireEvent.press(view.getByTestId('club-manage-invite-role-admin'));
+    await fireEvent.press(view.getByTestId('club-manage-invite'));
+    await waitFor(() => expect(api.addClubMember).toHaveBeenCalledWith(7, 'new@example.com', 'admin'));
+  });
+
+  it('邀请未注册邮箱给出核对指引，输入保留', async () => {
+    api.getClubProfile.mockResolvedValue(PROFILE);
+    api.addClubMember.mockRejectedValue({ status: 404, body: { status: -1, message: '未找到该用户' } });
+    const view = await renderApp(<ClubManageScreen clubId="7" />);
+
+    await waitFor(() => expect(view.getByTestId('club-manage-invite-input')).toBeTruthy());
+    await fireEvent.changeText(view.getByTestId('club-manage-invite-input'), 'ghost@example.com');
+    await fireEvent.press(view.getByTestId('club-manage-invite'));
+    await waitFor(() => expect(view.getByTestId('club-manage-invite-error')).toBeTruthy());
+    expect(within(view.getByTestId('club-manage-invite-error')).getByText(/未注册/)).toBeTruthy();
+    expect(view.getByTestId('club-manage-invite-input').props.value).toBe('ghost@example.com');
+  });
+
+  it('成员列表显示角色标签', async () => {
+    api.getClubProfile.mockResolvedValue(PROFILE);
+    const view = await renderApp(<ClubManageScreen clubId="7" />);
+
+    await waitFor(() => expect(view.getByTestId('club-manage-remove-2')).toBeTruthy());
+    expect(within(view.getByTestId('club-manage-member-1')).getByText('管理员')).toBeTruthy();
+    expect(within(view.getByTestId('club-manage-member-2')).getByText('成员')).toBeTruthy();
+  });
 });
