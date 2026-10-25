@@ -28,11 +28,11 @@ it('increments the cache version and supports unsubscribe', async () => {
   expect(listener).toHaveBeenCalledTimes(1);
 });
 
-jest.mock('../../../shared/api/request', () => ({ get: jest.fn(), post: jest.fn(), patch: jest.fn(), del: jest.fn() }));
+jest.mock('../../../shared/api/request', () => ({ request: jest.fn(), get: jest.fn(), post: jest.fn(), patch: jest.fn(), del: jest.fn() }));
 it('postProductComment refuses to send without an explicit rating', () => {
   const request = require('../../../shared/api/request');
   const { postProductComment } = require('../../../shared/api/canteen');
   expect(() => postProductComment(9, { content: 'x' })).toThrow(/rating/);
   expect(() => postProductComment(9, { content: 'x', rating: '顶级' })).not.toThrow();
-  expect(request.post).toHaveBeenCalledTimes(1);
+  expect(request.request).toHaveBeenCalledTimes(1);
 });
