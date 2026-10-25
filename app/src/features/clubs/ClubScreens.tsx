@@ -18,11 +18,11 @@ import { useI18n } from '@/i18n';
 import { DetailScreen } from '@/proto/P3';
 import { deleteClubActivity, deleteClubPost, getActivityDetail, getClubPostDetail, getClubProfile, listClubs, listMyClubs, removeClubMember } from '../../../../shared/api/clubs';
 import { readClubActivityDetail, readClubPage, readClubPostDetail, readClubProfile, type ClubActivityDetail, type ClubPostDetail, type ClubProfile, type ClubSummary } from './model';
-import { useClubActivityRegistration } from './useClubActivityRegistration';
+import { useClubActivityRegistration, type ClubActivityRegistrationState } from './useClubActivityRegistration';
 import { useClubComments } from './useClubComments';
 import { exportClubActivityRegistrationsToDevice } from './exportRegistrations';
-import { useClubFollow } from './useClubFollow';
-import { useClubLike } from './useClubLike';
+import { useClubFollow, type ClubFollowState } from './useClubFollow';
+import { useClubLike, type ClubLikeState } from './useClubLike';
 import { useSession } from '@/features/auth/session';
 import { classifyAuthFailure, isSessionInvalid } from '@/features/auth/authFailure';
 
@@ -35,6 +35,23 @@ function appError(error: unknown): { kind: 'content' | 'permission' | 'unreachab
   if (status === 404) return { kind: 'content' };
   if (status === 401 || status === 403) return { kind: 'permission' };
   return { kind: error instanceof TypeError ? 'unreachable' : 'unknown' };
+}
+
+type ClubActionNoticeState = ClubFollowState | ClubLikeState | ClubActivityRegistrationState;
+
+/** Renders the shared failure feedback for club interactions (follow/like/registration). */
+function ClubActionNotice({ state, testID, onLogin }: { state: ClubActionNoticeState; testID: string; onLogin: () => void }): React.ReactElement | null {
+  const { t } = useI18n();
+  if (state === 'login') {
+    return <InlineNotice testID={testID} tone="info" message={t('clubs.notice.login')} actionLabel={t('action.login')} onAction={onLogin} />;
+  }
+  if (state === 'denied') {
+    return <InlineNotice testID={testID} tone="danger" message={t('clubs.notice.denied')} />;
+  }
+  if (state === 'failed') {
+    return <InlineNotice testID={testID} tone="danger" message={t('clubs.notice.failed')} />;
+  }
+  return null;
 }
 
 type ClubActivityPreview = { id: number; title: string };
@@ -198,17 +215,7 @@ export function ClubProfileScreen({ clubId }: { clubId: string }): React.ReactEl
           disabled={follow.state === 'working'}
           onPress={() => void follow.toggle()}
         />
-        {follow.state === 'login' ? (
-          <InlineNotice
-            testID="club-profile-follow-notice"
-            tone="info"
-            message={t('clubs.notice.login')}
-            actionLabel={t('action.login')}
-            onAction={() => router.push('/login')}
-          />
-        ) : follow.state === 'failed' ? (
-          <InlineNotice testID="club-profile-follow-notice" tone="danger" message={t('clubs.notice.failed')} />
-        ) : null}
+        <ClubActionNotice state={follow.state} testID="club-profile-follow-notice" onLogin={() => router.push('/login')} />
         {joinInfo.contactText ? <Text role="body">{joinInfo.contactText}</Text> : null}
         <Text role="caption">{t('clubs.members', { n: members.length })}</Text>
         {activities.length > 0 ? <Text role="headline">{t('clubs.activities')}</Text> : null}
@@ -403,7 +410,7 @@ export function ClubActivityDetailScreen({ activityId }: { activityId: string })
       onToggleLike={() => void like.toggle()}
       interactions={{ liked: like.liked, likeCount: like.count, commentCount: detail.stats.comments }}
       hero={detail.images.length > 0 ? <MediaGrid testID="club-activity-media" variant="hero" uris={detail.images} /> : undefined}
-      body={<><Text role="body">{detail.summary}</Text><Button testID="club-activity-registration" label={`${t(current.registered ? 'clubs.cancelRegistration' : 'clubs.register')} · ${t('clubs.registrationCount', { n: current.count })}`} loading={registration.state === 'working'} onPress={() => void (current.registered ? registration.cancel() : registration.register())} />{detail.viewer.canManage ? <><Button testID="club-activity-export-registrations" label={t('clubs.exportRegistrations')} loading={exporting} onPress={() => void exportRegistrations()} />{exportFailed ? <Text role="body" colorToken="text-danger">{t('clubs.exportFailed')}</Text> : null}</> : null}{comments.body}</>}
+      body={<><ClubActionNotice state={like.state} testID="club-like-notice" onLogin={() => router.push('/login')} /><Text role="body">{detail.summary}</Text><Button testID="club-activity-registration" label={`${t(current.registered ? 'clubs.cancelRegistration' : 'clubs.register')} · ${t('clubs.registrationCount', { n: current.count })}`} loading={registration.state === 'working'} onPress={() => void (current.registered ? registration.cancel() : registration.register())} /><ClubActionNotice state={registration.state} testID="club-activity-registration-notice" onLogin={() => router.push('/login')} />{detail.viewer.canManage ? <><Button testID="club-activity-export-registrations" label={t('clubs.exportRegistrations')} loading={exporting} onPress={() => void exportRegistrations()} />{exportFailed ? <Text role="body" colorToken="text-danger">{t('clubs.exportFailed')}</Text> : null}</> : null}{comments.body}</>}
       comments={comments.comments}
       labels={detailLabels(t)}
     />
@@ -442,7 +449,7 @@ export function ClubPostDetailScreen({ postId }: { postId: string }): React.Reac
       onToggleLike={() => void like.toggle()}
       interactions={{ liked: like.liked, likeCount: like.count, commentCount: detail.stats.comments }}
       hero={detail.images.length > 0 ? <MediaGrid testID="club-post-media" variant="hero" uris={detail.images} /> : undefined}
-      body={<><Text role="body">{detail.content}</Text>{comments.body}</>}
+      body={<><ClubActionNotice state={like.state} testID="club-like-notice" onLogin={() => router.push('/login')} /><Text role="body">{detail.content}</Text>{comments.body}</>}
       comments={comments.comments}
       labels={detailLabels(t)}
     />
