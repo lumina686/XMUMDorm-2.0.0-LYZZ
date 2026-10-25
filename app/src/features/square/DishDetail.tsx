@@ -72,7 +72,6 @@ export function DishDetail(): React.ReactElement {
   const params = useLocalSearchParams<{ id?: string }>();
   const { t } = useI18n();
   const theme = useTheme();
-  const [actionsHeight, setActionsHeight] = React.useState(theme.touchTarget + theme.space('space_4'));
 
   const productId = Number(params.id);
   const validId = Number.isInteger(productId) && productId > 0;
@@ -148,8 +147,7 @@ export function DishDetail(): React.ReactElement {
         </View>
       ) : undefined}
     >
-      <View style={{ flex: 1 }}>
-      <ScrollView testID="dish-scroll" contentContainerStyle={{ padding: theme.space('space_4'), gap: theme.space('space_4'), paddingBottom: actionsHeight + theme.space('space_4') }}>
+      <ScrollView testID="dish-scroll" style={{ flex: 1, minHeight: 0 }} contentContainerStyle={{ padding: theme.space('space_4'), gap: theme.space('space_4') }}>
         {detail.stale ? <OfflineBanner testID="dish-stale" variant="stale" message={t('canteen.cache.stale')} actionLabel={t('action.refresh')} onAction={detail.reload} /> : null}
         {detail.loading && detail.data === null ? (
           <LoadingState testID="dish-loading" />
@@ -250,7 +248,6 @@ export function DishDetail(): React.ReactElement {
           </>
         )}
       </ScrollView>
-      </View>
     </Screen>
   );
 }
