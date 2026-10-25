@@ -29,6 +29,7 @@ import {
   getConfessionWindow,
   createConfessionComment,
   toggleConfessionLike,
+  deleteConfession,
 } from '../../../shared/api/confessions';
 import type { ListScreenProps } from '@/components/ui/ListScreen';
 import { renderApp } from './helpers/renderApp';
@@ -96,6 +97,8 @@ jest.mock('../../../shared/api/confessions', () => ({
   toggleConfessionLike: jest.fn(),
   getConfessionComments: jest.fn(),
   createConfessionComment: jest.fn(),
+  deleteConfession: jest.fn(),
+  deleteConfessionComment: jest.fn(),
 }));
 
 /** 捕获分页 props：用例自己触发 append / refresh（FlashList 的滚动在 Jest 里不触发） */
@@ -685,4 +688,44 @@ describe('树洞四态（中英双语）', () => {
       expect(view.queryByText('secret-endpoint')).toBeNull();
     });
   }
+});
+
+describe('万能墙删除自己的帖子', () => {
+  const removeConfession = deleteConfession as jest.Mock;
+
+  it('作者在 ⋯ 菜单看到删除，确认后删除并返回', async () => {
+    wallDetail.mockResolvedValue({ id: 40, content: '我的墙帖', template_key: 'note', viewer_is_author: 1 });
+    removeConfession.mockResolvedValue({ status: 0 });
+    const view = await renderApp(<CampusDetailScreen postId="40" kind="wall" />);
+
+    await waitFor(() => expect(view.getByText('我的墙帖')).toBeTruthy());
+    await fireEvent.press(view.getByTestId('campus-detail-more'));
+    await fireEvent.press(view.getByTestId('campus-detail-menu-delete'));
+    const dialog = view.getByTestId('wall-delete-dialog');
+    await fireEvent.press(within(dialog).getAllByText('删除').at(-1)!);
+    await waitFor(() => expect(removeConfession).toHaveBeenCalledWith(40));
+    await waitFor(() => expect(routerMock.back).toHaveBeenCalled());
+  });
+
+  it('非作者不见删除入口', async () => {
+    wallDetail.mockResolvedValue({ id: 40, content: '别人的墙帖', template_key: 'note', viewer_is_author: 0 });
+    const view = await renderApp(<CampusDetailScreen postId="40" kind="wall" />);
+
+    await waitFor(() => expect(view.getByText('别人的墙帖')).toBeTruthy());
+    await fireEvent.press(view.getByTestId('campus-detail-more'));
+    expect(view.queryByTestId('campus-detail-menu-delete')).toBeNull();
+  });
+
+  it('删除失败停留本页并给出可读提示', async () => {
+    wallDetail.mockResolvedValue({ id: 40, content: '我的墙帖', template_key: 'note', viewer_is_author: 1 });
+    removeConfession.mockRejectedValue(new TypeError('Network request failed'));
+    const view = await renderApp(<CampusDetailScreen postId="40" kind="wall" />);
+
+    await waitFor(() => expect(view.getByText('我的墙帖')).toBeTruthy());
+    await fireEvent.press(view.getByTestId('campus-detail-more'));
+    await fireEvent.press(view.getByTestId('campus-detail-menu-delete'));
+    await fireEvent.press(within(view.getByTestId('wall-delete-dialog')).getAllByText('删除').at(-1)!);
+    await waitFor(() => expect(view.getByTestId('wall-delete-notice')).toBeTruthy());
+    expect(routerMock.back).not.toHaveBeenCalled();
+  });
 });
