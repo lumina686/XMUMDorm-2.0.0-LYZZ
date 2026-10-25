@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { waitFor, within } from '@testing-library/react-native';
+import { fireEvent, waitFor, within } from '@testing-library/react-native';
 
 import { renderApp } from './helpers/renderApp';
 
@@ -7,7 +7,7 @@ jest.mock('expo-router', () => {
   const state = { pushed: [] as unknown[], replaced: [] as unknown[] };
   return { __state: state, useRouter: () => ({ push: (target: unknown) => state.pushed.push(target), replace: (target: unknown) => state.replaced.push(target) }) };
 });
-jest.mock('../../../shared/api/clubs', () => ({ listMyClubs: jest.fn(), getClubProfile: jest.fn(), removeClubMember: jest.fn(), deleteClubActivity: jest.fn(), deleteClubPost: jest.fn() }));
+jest.mock('../../../shared/api/clubs', () => ({ listMyClubs: jest.fn(), getClubProfile: jest.fn(), removeClubMember: jest.fn(), deleteClubActivity: jest.fn(), deleteClubPost: jest.fn(), addClubMember: jest.fn() }));
 
 const api = require('../../../shared/api/clubs') as Record<string, jest.Mock>;
 const routerState = require('expo-router').__state as { pushed: unknown[]; replaced: unknown[] };
@@ -88,5 +88,38 @@ describe('P3A5-04 我的社团与管理入口', () => {
     await user.press(view.getByText('删除活动 · Jam'));
     await waitFor(() => expect(view.getByTestId('club-manage-notice')).toBeTruthy());
     expect(within(view.getByTestId('club-manage-notice')).getByText(/受限/)).toBeTruthy();
+  });
+
+  it('管理员输入邮箱邀请成员，以服务端回执刷新名单', async () => {
+    api.getClubProfile.mockResolvedValue(PROFILE);
+    api.addClubMember.mockResolvedValue({ status: 0 });
+    const view = await renderApp(<ClubManageScreen clubId="7" />);
+
+    await waitFor(() => expect(view.getByTestId('club-manage-invite-input')).toBeTruthy());
+    fireEvent.changeText(view.getByTestId('club-manage-invite-input'), 'new@example.com');
+    fireEvent.press(view.getByTestId('club-manage-invite'));
+    await waitFor(() => expect(api.addClubMember).toHaveBeenCalledWith(7, 'new@example.com', 'member'));
+    await waitFor(() => expect(api.getClubProfile).toHaveBeenCalledTimes(2));
+  });
+
+  it('空邮箱不发起邀请', async () => {
+    api.getClubProfile.mockResolvedValue(PROFILE);
+    const view = await renderApp(<ClubManageScreen clubId="7" />);
+
+    await waitFor(() => expect(view.getByTestId('club-manage-invite')).toBeTruthy());
+    fireEvent.press(view.getByTestId('club-manage-invite'));
+    expect(api.addClubMember).not.toHaveBeenCalled();
+  });
+
+  it('邀请回执非零不刷新名单且失败提示可见', async () => {
+    api.getClubProfile.mockResolvedValue(PROFILE);
+    api.addClubMember.mockResolvedValue({ status: -1 });
+    const view = await renderApp(<ClubManageScreen clubId="7" />);
+
+    await waitFor(() => expect(view.getByTestId('club-manage-invite-input')).toBeTruthy());
+    fireEvent.changeText(view.getByTestId('club-manage-invite-input'), 'new@example.com');
+    fireEvent.press(view.getByTestId('club-manage-invite'));
+    await waitFor(() => expect(view.getByTestId('club-manage-notice')).toBeTruthy());
+    expect(api.getClubProfile).toHaveBeenCalledTimes(1);
   });
 });
