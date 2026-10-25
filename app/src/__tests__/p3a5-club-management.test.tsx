@@ -73,9 +73,9 @@ describe('P3A5-04 我的社团与管理入口', () => {
     api.deleteClubActivity.mockRejectedValue(new TypeError('Network request failed'));
     const view = await renderApp(<ClubManageScreen clubId="7" />);
 
-    await waitFor(() => expect(view.getByText('删除活动 · Jam')).toBeTruthy());
+    await waitFor(() => expect(view.getByText('Jam')).toBeTruthy());
     const user = require('@testing-library/react-native').userEvent.setup();
-    await user.press(view.getByText('删除活动 · Jam'));
+    await user.press(view.getByTestId('club-manage-delete-activity-5'));
     await waitFor(() => expect(view.getByTestId('club-manage-notice')).toBeTruthy());
     expect(within(view.getByTestId('club-manage-notice')).getByText(/网络不稳定/)).toBeTruthy();
   });
@@ -85,9 +85,9 @@ describe('P3A5-04 我的社团与管理入口', () => {
     api.deleteClubActivity.mockRejectedValue({ status: 403, body: { muted: true } });
     const view = await renderApp(<ClubManageScreen clubId="7" />);
 
-    await waitFor(() => expect(view.getByText('删除活动 · Jam')).toBeTruthy());
+    await waitFor(() => expect(view.getByText('Jam')).toBeTruthy());
     const user = require('@testing-library/react-native').userEvent.setup();
-    await user.press(view.getByText('删除活动 · Jam'));
+    await user.press(view.getByTestId('club-manage-delete-activity-5'));
     await waitFor(() => expect(view.getByTestId('club-manage-notice')).toBeTruthy());
     expect(within(view.getByTestId('club-manage-notice')).getByText(/受限/)).toBeTruthy();
   });
@@ -155,8 +155,8 @@ describe('P3A5-04 我的社团与管理入口', () => {
     const view = await renderApp(<ClubManageScreen clubId="7" />);
 
     await waitFor(() => expect(view.getByText('某条动态')).toBeTruthy());
-    expect(view.getByTestId('club-manage-delete-post-12').props.label).toBe('删除动态');
-    expect(view.getByTestId('club-manage-delete-activity-5').props.label).toBe('删除活动');
+    expect(within(view.getByTestId('club-manage-delete-post-12')).getByText('删除动态')).toBeTruthy();
+    expect(within(view.getByTestId('club-manage-delete-activity-5')).getByText('删除活动')).toBeTruthy();
   });
 
   it('成员列表显示角色标签', async () => {

@@ -173,7 +173,8 @@ describe('P3A5-02 社团发现与主页', () => {
     const view = await renderApp(<ClubProfileScreen clubId="7" />);
 
     await waitFor(() => expect(view.getByTestId('club-profile-post-12')).toBeTruthy());
-    expect(view.getByTestId('club-profile-post-12').props.accessibilityLabel).not.toBe(LONG);
+    // 行不再是 Button：全文不再作为按钮 label prop 存在（ListItem 的读屏名是行内容，不是动作词）
+    expect(view.getByTestId('club-profile-post-12').props.label).toBeUndefined();
     await fireEvent.press(view.getByTestId('club-profile-post-12'));
     expect(routerState.pushed).toEqual(['/clubs/post/12']);
   });
