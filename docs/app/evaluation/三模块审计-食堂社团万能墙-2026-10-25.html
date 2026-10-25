@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>食堂·社团·万能墙：主体已兑现，平均完成 90%，两个严重缺陷待修</title>
+<style>
+:root{
+  --radius:6px;
+  --bw:1px;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"JetBrains Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --bg:#f7f7f5; --paper:#ffffff; --ink:#16181d; --ink2:#4b5260; --ink3:#8b929e;
+  --line:#1d2026; --line2:#dfe3e8; --fill:#f2f4f7;
+  --accent:#1d5fbf; --accent-bg:#e8eff9;
+  --ok:#1a7f4b; --ok-bg:#e8f5ee;
+  --warn:#93600a; --warn-bg:#fdf4e3;
+  --err:#b3261e; --err-bg:#fbeceb;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#0b1220; --paper:#111a2b; --ink:#e8eef8; --ink2:#a9b8cc; --ink3:#6b7f99;
+    --line:#c9d6e8; --line2:#22304a; --fill:#16233a;
+    --accent:#7cb0ff; --accent-bg:#16305a;
+    --ok:#5ddc95; --ok-bg:#0f3a26;
+    --warn:#f0b14a; --warn-bg:#3a2a10;
+    --err:#ff8a80; --err-bg:#3d1518;
+  }
+}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;padding:40px 24px 64px;background:var(--bg);color:var(--ink);font:15px/1.6 var(--sans)}
+.doc{max-width:1100px;margin:0 auto}
+p{margin:0;max-width:72ch}
+ul,ol{margin:0;padding-left:20px;max-width:72ch}
+li+li{margin-top:4px}
+a{color:var(--accent)}
+a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+strong{font-weight:650}
+
+/* one rhythm rule for every sibling pair: margin-collapse bugs become impossible */
+.sec-body > * + *{margin-top:14px}
+.verdict-body > * + *{margin-top:10px}
+.body > .sec + .sec{margin-top:18px}
+
+.head{margin-bottom:28px;padding-bottom:20px;border-bottom:var(--bw) solid var(--line2)}
+.kicker{margin:0 0 8px;font:600 12px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink2)}
+h1{margin:0 0 8px;font-size:26px;line-height:1.25;letter-spacing:-.01em}
+.sub{margin:0 0 18px;font-size:15px;color:var(--ink2)}
+h2{margin:0 0 10px;font-size:17px;line-height:1.35}
+h3{margin:18px 0 6px;font-size:15px}
+h2 + h3,h3:first-child{margin-top:0}
+
+.meta{display:flex;flex-wrap:wrap;gap:0 28px;margin:0;padding:0;border-top:var(--bw) solid var(--line2);border-bottom:var(--bw) solid var(--line2)}
+.meta > div{display:flex;gap:8px;align-items:baseline;padding:8px 0}
+.meta dt{margin:0;font:600 12px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink2)}
+.meta dd{margin:0;font-size:13px}
+
+.verdict{margin:0 0 24px;padding:16px 18px;background:var(--paper);border:var(--bw) solid var(--line);border-left:4px solid var(--accent);border-radius:var(--radius)}
+.verdict-title{margin:0 0 8px;font:600 12px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.verdict-body{font-size:16px}
+
+.toc{margin:0 0 28px}
+.toc-title{margin:0 0 8px;font:600 12px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink2)}
+.toc ol{display:flex;flex-wrap:wrap;gap:6px 20px;padding:0;list-style:none;max-width:none}
+.toc a{font-size:13px;text-decoration:none;border-bottom:var(--bw) solid var(--line2);padding-bottom:2px}
+.toc a:hover{border-bottom-color:var(--accent)}
+
+.sec{padding:18px 20px;background:var(--paper);border:var(--bw) solid var(--line2);border-radius:var(--radius)}
+
+.table-wrap{overflow-x:auto}
+table.data{width:100%;border-collapse:collapse;font-size:14px}
+.data th,.data td{padding:7px 10px;text-align:left;vertical-align:top;border-bottom:var(--bw) solid var(--line2)}
+.data th{font:600 12px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink2);border-bottom-color:var(--line)}
+.data tr:last-child td{border-bottom:0}
+.data .num{text-align:right;font-variant-numeric:tabular-nums}
+.st{display:inline-flex;gap:5px;align-items:center;font-weight:600;white-space:nowrap}
+.st--ok{color:var(--ok)}
+.st--ok::before{content:"\2713"}
+.st--no{color:var(--err)}
+.st--no::before{content:"\2717"}
+.st--warn{color:var(--warn)}
+.st--warn::before{content:"!"}
+
+.callout{padding:12px 14px;background:var(--accent-bg);border:var(--bw) solid var(--line2);border-left:4px solid var(--accent);border-radius:var(--radius)}
+.callout-title{margin:0 0 4px;font-size:13.5px;font-weight:650}
+.callout--ok{background:var(--ok-bg);border-left-color:var(--ok)}
+.callout--warn{background:var(--warn-bg);border-left-color:var(--warn)}
+.callout--err{background:var(--err-bg);border-left-color:var(--err)}
+
+.flow{display:flex;flex-direction:column;gap:0}
+.flow-step{position:relative;padding:0 0 18px 22px;border-left:var(--bw) solid var(--line2)}
+.flow-step:last-child{padding-bottom:0;border-left-color:transparent}
+.flow-step::before{content:"";position:absolute;left:-4px;top:6px;width:7px;height:7px;border-radius:50%;background:var(--accent)}
+.flow-step .step-label{display:block;font:600 12px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink2)}
+.flow-step p{margin-top:4px}
+
+.grid-2,.grid-3{display:grid;gap:14px}
+.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.card{padding:12px 14px;background:var(--paper);border:var(--bw) solid var(--line2);border-radius:var(--radius)}
+.card h3{margin:0 0 6px;font-size:14px}
+.card p{font-size:13.5px}
+
+.bars{display:grid;gap:10px}
+.bar{display:grid;grid-template-columns:minmax(120px,180px) 1fr auto;gap:12px;align-items:center}
+.bar-label{font-size:13.5px}
+.bar-track{height:10px;background:var(--fill);border-radius:4px;overflow:hidden}
+.bar-fill{display:block;height:100%;width:calc(var(--v) / var(--max) * 100%);background:var(--accent)}
+.bar-fill--over{background:var(--err)}
+.bar-value{font:12.5px var(--mono);font-variant-numeric:tabular-nums;color:var(--ink2)}
+
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0}
+.kv dt{font:600 12px var(--mono);letter-spacing:.05em;text-transform:uppercase;color:var(--ink2)}
+.kv dd{margin:0;font-size:13.5px}
+
+code{font:12.5px/1.5 var(--mono);padding:1px 5px;background:var(--fill);border:var(--bw) solid var(--line2);border-radius:4px}
+pre{margin:0;padding:12px 14px;overflow-x:auto;background:var(--fill);border:var(--bw) solid var(--line2);border-radius:var(--radius)}
+pre code{padding:0;background:none;border:0}
+
+figure.diagram{margin:0}
+/* SVG rule: coordinates on a 20px grid, stroke/fill only from the variables above. */
+.diagram svg{display:block;max-width:100%;height:auto}
+.diagram figcaption{margin-top:6px;font-size:12.5px;color:var(--ink2)}
+
+.colophon{margin-top:36px;padding-top:12px;border-top:var(--bw) solid var(--line2);font:12px/1.6 var(--mono);color:var(--ink3)}
+
+@media (max-width:760px){
+  body{padding:28px 14px 40px}
+  .grid-2,.grid-3{grid-template-columns:1fr}
+  .bar{grid-template-columns:1fr auto;gap:6px 12px}
+  .bar-track{grid-column:1 / -1;order:3}
+  h1{font-size:22px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+}
+@media print{
+  body{padding:0;background:var(--paper)}
+  .toc{display:none}
+  .sec,.verdict,.card{break-inside:avoid}
+  .table-wrap{overflow:visible}
+  .colophon{color:var(--ink2)}
+}
+</style>
+</head>
+<body>
+<main class="doc">
+
+  <header class="head">
+    <p class="kicker">审计 · Audit</p>
+    <h1>食堂·社团·万能墙：主体已兑现，平均完成 90%，两个严重缺陷待修</h1>
+    <p class="sub">App 端食堂 / 社团 / 万能墙三模块现状审计 · 基线 HEAD = db9f491e</p>
+    <dl class="meta">
+      <div><dt>状态</dt><dd>待评审</dd></div>
+      <div><dt>日期</dt><dd>2026-10-25</dd></div>
+      <div><dt>锁定</dt><dd>11 项缺陷判定与一一对应的 11 份改进计划</dd></div>
+      <div><dt>来源</dt><dd>代码 HEAD db9f491e + docs/04-Module 与 docs/app/task 需求文档；双轴并行子代理，主审复验</dd></div>
+    </dl>
+  </header>
+
+  <section class="verdict">
+    <p class="verdict-title">结论</p>
+    <div class="verdict-body">
+      <p>三模块主体已兑现，平均完成 90%，无阻断项。两个严重缺陷建议优先处理：D-1 失败态无反馈（社团关注/报名/点赞失败时界面无任何提示）与 D-5 菜品详情自绘粘性底栏（违反已冻结的骨架规范）。其余为次要与关注级。</p>
+    </div>
+  </section>
+
+  <nav class="toc">
+    <p class="toc-title">目录</p>
+    <ol>
+      <li><a href="#sec-1">1 · 需求兑现</a></li>
+      <li><a href="#sec-2">2 · 缺陷</a></li>
+      <li><a href="#sec-3">3 · 改进计划</a></li>
+    </ol>
+  </nav>
+
+  <article class="body">
+
+    <section class="sec" id="sec-1">
+      <h2>1. 需求兑现</h2>
+      <div class="sec-body">
+        <p><strong>本轮：6 项需求，3 项已交付，平均完成 90%。</strong></p>
+        <div class="table-wrap">
+          <table class="data">
+            <thead>
+              <tr><th>#</th><th>需求</th><th>来源</th><th>交付</th><th class="num">完成</th><th>证据</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>R-1</td><td>食堂 App 能力对齐（检索/五档点评/读缓存/收藏）</td><td>P2Y-B04·B03·C01·D03 + 食堂Web信息流治理规格</td><td><span class="st st--ok">已交付</span></td><td class="num">100%</td><td>检索竞争丢弃 <code>CanteenSearchScreen.tsx<wbr>:32</code>；缓存 revision 门 <code>canteenCache.ts<wbr>:24</code>；收藏防抖 <code>DishActions.tsx<wbr>:56</code></td></tr>
+              <tr><td>R-2</td><td>社团 App 能力矩阵（13 项验收）</td><td>交付-P3C-00-02 + P3C-04-01…10</td><td><span class="st st--warn">部分交付</span></td><td class="num">75%</td><td>通过 9 项；失败反馈缺失见 D-1，邀请/角色与创建入口缺失见 D-2</td></tr>
+              <tr><td>R-3</td><td>万能墙 App 能力（7 项验收）</td><td>M09 模块设计 + App页面清单与结构盘点</td><td><span class="st st--warn">部分交付</span></td><td class="num">85%</td><td>通过 6 项；删自己的墙帖 App 未接（D-3）；游标防死循环 <code>WallFeed.tsx<wbr>:87</code></td></tr>
+              <tr><td>R-4</td><td>三模块 UI 文案走 zh/en 双语字典</td><td>app/src/i18n 收口约定</td><td><span class="st st--ok">已交付</span></td><td class="num">100%</td><td>zh/en 各 728 键零差集（双轴独立核验一致）</td></tr>
+              <tr><td>R-5</td><td>三条后端路由测试覆盖</td><td>00-Constitution 测试铁律</td><td><span class="st st--warn">部分交付</span></td><td class="num">85%</td><td><code>__tests__/<wbr>clubs.test.js</code>、<code>posts.test.js</code> 齐全；canteen 仅 3 个专项测试</td></tr>
+              <tr><td>R-6</td><td>App 复用 shared/api，不自建请求</td><td>CLAUDE.md 收口约定</td><td><span class="st st--ok">已交付</span></td><td class="num">100%</td><td>三模块请求全部经 <code>shared/<wbr>api</code>；唯一原生 fetch 仅 Web 图片 blob 转换</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="bars">
+          <div class="bar"><span class="bar-label">R-1 食堂</span><span class="bar-track"><span class="bar-fill" style="--v:100;--max:100"></span></span><span class="bar-value">100%</span></div>
+          <div class="bar"><span class="bar-label">R-2 社团</span><span class="bar-track"><span class="bar-fill" style="--v:75;--max:100"></span></span><span class="bar-value">75%</span></div>
+          <div class="bar"><span class="bar-label">R-3 万能墙</span><span class="bar-track"><span class="bar-fill" style="--v:85;--max:100"></span></span><span class="bar-value">85%</span></div>
+          <div class="bar"><span class="bar-label">R-4 双语</span><span class="bar-track"><span class="bar-fill" style="--v:100;--max:100"></span></span><span class="bar-value">100%</span></div>
+          <div class="bar"><span class="bar-label">R-5 测试</span><span class="bar-track"><span class="bar-fill" style="--v:85;--max:100"></span></span><span class="bar-value">85%</span></div>
+          <div class="bar"><span class="bar-label">R-6 收口</span><span class="bar-track"><span class="bar-fill" style="--v:100;--max:100"></span></span><span class="bar-value">100%</span></div>
+        </div>
+        <p>百分比口径：已验证验收项 / 验收项总数，部分项计半，统一取 5% 档。</p>
+      </div>
+    </section>
+
+    <section class="sec" id="sec-2">
+      <h2>2. 缺陷</h2>
+      <div class="sec-body">
+        <div class="table-wrap">
+          <table class="data">
+            <thead>
+              <tr><th>ID</th><th>轴</th><th>缺陷</th><th>位置</th><th>严重度</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>D-1</td><td>Spec</td><td>社团关注/报名/点赞失败态无任何 UI 反馈</td><td><code>ClubScreens.tsx<wbr>:197,391,394</code></td><td><span class="st st--no">严重</span></td></tr>
+              <tr><td>D-2</td><td>Spec</td><td>社团管理页缺邀请成员与角色设置</td><td><code>ClubScreens.tsx<wbr>:286</code> 区域</td><td><span class="st st--warn">次要</span></td></tr>
+              <tr><td>D-3</td><td>Spec</td><td>万能墙不能删自己的墙帖/评论</td><td>app/src/features/campus（无调用）</td><td><span class="st st--warn">次要</span></td></tr>
+              <tr><td>D-4</td><td>Spec</td><td>社团发现页未接搜索与分类筛选</td><td><code>ClubScreens.tsx<wbr>:87</code></td><td>关注</td></tr>
+              <tr><td>D-5</td><td>Standards</td><td>菜品详情自绘粘性底栏并自算高度</td><td><code>DishDetail.tsx<wbr>:243</code></td><td><span class="st st--no">严重</span></td></tr>
+              <tr><td>D-6</td><td>Standards</td><td>社团管理页错误文案笼统</td><td><code>zh.ts<wbr>:637</code>、<code>ClubScreens.tsx<wbr>:286</code></td><td><span class="st st--warn">次要</span></td></tr>
+              <tr><td>D-7</td><td>Standards</td><td>帖子全文作按钮 label</td><td><code>ClubScreens.tsx<wbr>:208,290</code></td><td><span class="st st--warn">次要</span></td></tr>
+              <tr><td>D-8</td><td>Standards</td><td>可选 JWT 解析三处手写重复</td><td><code>posts.js<wbr>:41</code>、<code>clubs.js<wbr>:36</code>、<code>canteen.js<wbr>:216</code></td><td><span class="st st--warn">次要</span></td></tr>
+              <tr><td>D-9</td><td>Standards</td><td>社团三份同构状态机</td><td><code>useClubFollow.ts</code> 等 3 文件</td><td><span class="st st--warn">次要</span></td></tr>
+              <tr><td>D-10</td><td>Standards</td><td>点评缺省值静默编造评分「人上人」</td><td><code>shared/<wbr>api/<wbr>canteen.js<wbr>:194</code></td><td>关注</td></tr>
+              <tr><td>D-11</td><td>Standards</td><td>万能墙清单模板用文字符号模拟控件</td><td><code>wallTemplates.tsx<wbr>:33</code></td><td>关注</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>D-1 社团失败态无反馈</h3>
+        <dl class="kv">
+          <dt>症状</dt><dd>关注、报名、点赞三个交互失败（未登录、无权限、网络错误）时界面无提示，按钮点了像没点。</dd>
+          <dt>证据</dt><dd><code>ClubScreens.tsx<wbr>:197</code> 仅在 working 态禁用按钮；<code>ClubScreens.tsx<wbr>:394</code> 仅在 working 态显示 loading；<code>ClubScreens.tsx<wbr>:391,430</code> 点赞只读 <code>like.liked</code>，<code>like.state</code> 全文件零引用。三个 hook 都声明了 login/denied/failed 态（<code>useClubFollow.ts<wbr>:8</code>），渲染层全部丢弃。</dd>
+          <dt>影响</dt><dd>未登录用户点关注无任何引导，违反验收门槛且流失交互。</dd>
+          <dt>判据</dt><dd>交付-P3C-00-02 批次 4 验收门槛原文「报名、点赞、评论、关注在成功与失败后均有可见反馈」；宪法 10.4「可感知/可理解/可改正」。</dd>
+        </dl>
+
+        <h3>D-2 社团管理缺邀请与角色设置</h3>
+        <dl class="kv">
+          <dt>症状</dt><dd>管理页只有移除成员，没有邀请成员和角色设置。</dd>
+          <dt>证据</dt><dd><code>ClubScreens.tsx<wbr>:286</code> 区域管理页仅渲染 removeMember；<code>shared/<wbr>api/<wbr>clubs.js<wbr>:145</code> 的 addClubMember 已存在且 Web 在用（<code>frontend/<wbr>src/<wbr>pages/<wbr>Clubs/<wbr>ClubProfile.jsx<wbr>:123</code>）。</dd>
+          <dt>影响</dt><dd>社团管理员在 App 上无法完成成员增补，需回 Web 操作。</dd>
+          <dt>判据</dt><dd>交付-P3C-00-02 矩阵「管理成员」行原文「App 缺失；补邀请/角色设置」。</dd>
+        </dl>
+
+        <h3>D-3 万能墙删帖缺失</h3>
+        <dl class="kv">
+          <dt>症状</dt><dd>App 万能墙不能删除自己发布的墙帖和评论，Web 可以。</dd>
+          <dt>证据</dt><dd><code>shared/<wbr>api/<wbr>confessions.js<wbr>:51</code> 已有 deleteConfession；<code>frontend/<wbr>src/<wbr>pages/<wbr>ConfessionWall.jsx<wbr>:23</code> 在用；app/src/features/campus 全目录无调用。</dd>
+          <dt>影响</dt><dd>误发内容在 App 端无法撤回，学生侧能力未对齐 Web。</dd>
+          <dt>判据</dt><dd>M09 模块设计 §6.1 删除墙帖边界；宪法第二轮裁决「面向学生能力全面对齐 Web」。</dd>
+        </dl>
+
+        <h3>D-4 社团发现页未接搜索筛选</h3>
+        <dl class="kv">
+          <dt>症状</dt><dd>发现页只翻页，不接关键词搜索与分类筛选。</dd>
+          <dt>证据</dt><dd><code>ClubScreens.tsx<wbr>:87</code> 仅传 <code>{ page, pageSize }</code>；后端 <code>routes/<wbr>clubs.js<wbr>:1284</code> 与 <code>shared/<wbr>api/<wbr>clubs.js<wbr>:36</code> 均已支持 q/分类参数。</dd>
+          <dt>影响</dt><dd>社团多时找不到目标，后端能力闲置。</dd>
+          <dt>判据</dt><dd>P3C-04-01 社团发现真源「可搜索、可按分类筛选」。</dd>
+        </dl>
+
+        <h3>D-5 菜品详情自绘粘性底栏</h3>
+        <dl class="kv">
+          <dt>症状</dt><dd>菜品详情用 position:absolute 自绘底部操作条并 onLayout 自算高度。</dd>
+          <dt>证据</dt><dd><code>DishDetail.tsx<wbr>:243-245</code> absolute 定位 + setActionsHeight 自测量。</dd>
+          <dt>影响</dt><dd>键盘/安全区场景高度口径与全局 Screen 不一致，是骨架规范明令禁止的「页面自己算」。</dd>
+          <dt>判据</dt><dd>App页面骨架与布局规范 L271「2026-10-18 起统一由 Screen 的 footer 槽实现，页面不得自己算」。</dd>
+        </dl>
+
+        <h3>D-6 笼统错误文案</h3>
+        <dl class="kv">
+          <dt>症状</dt><dd>管理页所有操作失败共用一句「操作未完成，请重试」。</dd>
+          <dt>证据</dt><dd><code>zh.ts<wbr>:637</code> clubs.actionFailed；渲染于 <code>ClubScreens.tsx<wbr>:286</code>。</dd>
+          <dt>影响</dt><dd>用户不知道错在哪、怎么改，违反宪法 10.4 后两要素。</dd>
+          <dt>判据</dt><dd>宪法 10.4「可感知/可理解/可改正」三要素。</dd>
+        </dl>
+
+        <h3>D-7 帖子全文作按钮 label</h3>
+        <dl class="kv">
+          <dt>症状</dt><dd>社团主页与删除按钮直接把帖子全文当 label。</dd>
+          <dt>证据</dt><dd><code>ClubScreens.tsx<wbr>:208</code> <code>label={post.content}</code>；<code>ClubScreens.tsx<wbr>:290</code> 删除动态 · post.content。</dd>
+          <dt>影响</dt><dd>长帖撑爆按钮，视觉与触控目标失控。</dd>
+          <dt>判据</dt><dd>宪法 10.5「按钮/标签 ≤6 汉字」。</dd>
+        </dl>
+
+        <h3>D-8 可选 JWT 三处手写</h3>
+        <dl class="kv">
+          <dt>症状</dt><dd>可选用户解析在三条路由各写一份，canteen.js 一份还是回调式另造的。</dd>
+          <dt>证据</dt><dd><code>routes/<wbr>posts.js<wbr>:41-51</code> 与 <code>routes/<wbr>clubs.js<wbr>:36-42</code> 近逐字相同；<code>routes/<wbr>canteen.js<wbr>:216-228</code> 第三份手写。</dd>
+          <dt>影响</dt><dd>改密钥或解析规则要改三处，已经出现两种写法。</dd>
+          <dt>判据</dt><dd>嗅探基线 Duplicated Code（judgement call）。</dd>
+        </dl>
+
+        <h3>D-9 社团三份同构状态机</h3>
+        <dl class="kv">
+          <dt>症状</dt><dd>关注、点赞、报名三个 hook 是同一状态机的三份拷贝（epoch/locked/六态）。</dd>
+          <dt>证据</dt><dd>useClubFollow.ts、useClubLike.ts、useClubActivityRegistration.ts 骨架一致，仅回执校验不同。</dd>
+          <dt>影响</dt><dd>补一个态（如离线提示）要改三处。</dd>
+          <dt>判据</dt><dd>嗅探基线 Duplicated Code（judgement call）。</dd>
+        </dl>
+
+        <h3>D-10 点评缺省值编造评分</h3>
+        <dl class="kv">
+          <dt>症状</dt><dd>共享层点评函数在调用方漏传 rating 时默认提交「人上人」。</dd>
+          <dt>证据</dt><dd><code>shared/<wbr>api/<wbr>canteen.js<wbr>:194</code> <code>rating = '人上人'</code> 缺省；App 表单已强制选择（<code>review.ts<wbr>:14</code>），缺省值只为掩盖漏传。</dd>
+          <dt>影响</dt><dd>未来任何调用方漏传即静默编造用户评分。</dd>
+          <dt>判据</dt><dd>嗅探基线 Primitive Obsession（judgement call）。</dd>
+        </dl>
+
+        <h3>D-11 清单模板文字符号</h3>
+        <dl class="kv">
+          <dt>症状</dt><dd>万能墙清单模板用 Unicode 字符 □ 渲染待办符号。</dd>
+          <dt>证据</dt><dd><code>wallTemplates.tsx<wbr>:33</code> <code>□ ${line}</code>。</dd>
+          <dt>影响</dt><dd>以文字符号模拟控件观感，与两层图标体系的归属规则相悖。</dd>
+          <dt>判据</dt><dd>宪法 1.3.6/16 两层图标体系（judgement call：□ 非 Emoji，属灰色地带）。</dd>
+        </dl>
+      </div>
+    </section>
+
+    <section class="sec" id="sec-3">
+      <h2>3. 改进计划</h2>
+      <div class="sec-body">
+        <p>一个缺陷对应一个计划，编号一致。easy-plan 可把下列计划编成阶段与任务。</p>
+
+        <h3>P-1 ← D-1 补失败态可见反馈</h3>
+        <dl class="kv">
+          <dt>建什么</dt><dd>关注/报名/点赞渲染 login/denied/failed 态——未登录跳登录引导，其余给具体原因文案；复用 D-9 抽出的公共状态机。</dd>
+          <dt>触及</dt><dd>app/src/features/clubs/**、app/src/i18n/{zh,en}.ts</dd>
+          <dt>验收</dt><dd>未登录点关注出现登录引导；网络失败出现可理解文案；批次 4 验收门槛「成功与失败后均有可见反馈」逐项通过。</dd>
+          <dt>阻塞</dt><dd>无，可立即开始。</dd>
+          <dt>范围外</dt><dd>D-6 的文案具体化，见 P-6。</dd>
+        </dl>
+
+        <h3>P-2 ← D-2 管理页补邀请与角色设置</h3>
+        <dl class="kv">
+          <dt>建什么</dt><dd>管理页接 addClubMember（邮箱邀请 + 角色下拉），角色变更走现有成员端点。</dd>
+          <dt>触及</dt><dd>app/src/features/clubs/ClubScreens.tsx、shared/api/clubs.js（仅按需补角色端点封装）</dd>
+          <dt>验收</dt><dd>社团管理员可在 App 邀请成员并设角色；无权限者不见入口且服务端拒绝；双语词条齐全。</dd>
+          <dt>阻塞</dt><dd>无。</dd>
+          <dt>范围外</dt><dd>创建社团站管入口（矩阵列明仅站管可见，待与 TO-CONFIRM 一并拍板优先级）。</dd>
+        </dl>
+
+        <h3>P-3 ← D-3 万能墙补删帖</h3>
+        <dl class="kv">
+          <dt>建什么</dt><dd>WallFeed 与详情为自己的墙帖/评论挂删除动作，确认走 AlertDialog，接 deleteConfession/deleteConfessionComment。</dd>
+          <dt>触及</dt><dd>app/src/features/campus/**</dd>
+          <dt>验收</dt><dd>仅作者本人可见删除入口；删除后列表乐观移除且刷新一致；双语词条齐全。</dd>
+          <dt>阻塞</dt><dd>无。</dd>
+          <dt>范围外</dt><dd>管理端删帖（App 不对齐 M06）。</dd>
+        </dl>
+
+        <h3>P-4 ← D-4 发现页接搜索筛选</h3>
+        <dl class="kv">
+          <dt>建什么</dt><dd>发现页顶部搜索框 + 分类筛选，参数透传 listClubs({ q, category })，输入防抖。</dd>
+          <dt>触及</dt><dd>app/src/features/clubs/ClubScreens.tsx、app/src/i18n/{zh,en}.ts</dd>
+          <dt>验收</dt><dd>关键词与分类可组合过滤；翻页与筛选状态互不踩；参考 CanteenSearchScreen 竞争丢弃写法。</dd>
+          <dt>阻塞</dt><dd>无。</dd>
+          <dt>范围外</dt><dd>后端新参数（已存在）。</dd>
+        </dl>
+
+        <h3>P-5 ← D-5 菜品详情底栏归位 Screen footer 槽</h3>
+        <dl class="kv">
+          <dt>建什么</dt><dd>删自绘 absolute 底栏与 onLayout 自算，DishActions 移入 Screen 的 footer 槽。</dd>
+          <dt>触及</dt><dd>app/src/features/square/DishDetail.tsx</dd>
+          <dt>验收</dt><dd>键盘弹出/收起高度由 resolveFooterBottomPadding 统一处理；全机型矩阵抽查无遮挡；文件内不再有自算高度代码。</dd>
+          <dt>阻塞</dt><dd>无。</dd>
+          <dt>范围外</dt><dd>其他页同类底栏（如发现另行审计）。</dd>
+        </dl>
+
+        <h3>P-6 ← D-6 错误文案具体化</h3>
+        <dl class="kv">
+          <dt>建什么</dt><dd>按失败类型拆词条（网络/权限/已过期），映射 D-1 的三态反馈。</dd>
+          <dt>触及</dt><dd>app/src/i18n/{zh,en}.ts、app/src/features/clubs/ClubScreens.tsx</dd>
+          <dt>验收</dt><dd>每条错误文案含「错在哪 + 怎么改」；zh/en 同步；10.4 三要素逐条自检通过。</dd>
+          <dt>阻塞</dt><dd>P-1 失败态反馈（共用渲染位）。</dd>
+          <dt>范围外</dt><dd>食堂/万能墙错误文案（另行排查）。</dd>
+        </dl>
+
+        <h3>P-7 ← D-7 按钮 label 收敛</h3>
+        <dl class="kv">
+          <dt>建什么</dt><dd>帖子/活动行改为标题截断 + 副文本排版，删除类按钮只留动作词，正文移入行内容。</dd>
+          <dt>触及</dt><dd>app/src/features/clubs/ClubScreens.tsx</dd>
+          <dt>验收</dt><dd>所有按钮 label ≤6 汉字；长帖不再撑爆按钮；触控目标不小于 48dp。</dd>
+          <dt>阻塞</dt><dd>无。</dd>
+          <dt>范围外</dt><dd>列表整体改版。</dd>
+        </dl>
+
+        <h3>P-8 ← D-8 抽公共可选鉴权</h3>
+        <dl class="kv">
+          <dt>建什么</dt><dd>三份可选 JWT 解析收拢为一个 parseOptionalUser 工具（回调式那份同步化），三条路由引用。</dd>
+          <dt>触及</dt><dd>routes/{posts,clubs,canteen}.js、工具层</dd>
+          <dt>验收</dt><dd>全库仅一份实现；三路由现有测试全绿；无鉴权行为变化。</dd>
+          <dt>阻塞</dt><dd>无。</dd>
+          <dt>范围外</dt><dd>鉴权中间件化重构。</dd>
+        </dl>
+
+        <h3>P-9 ← D-9 抽公共状态机</h3>
+        <dl class="kv">
+          <dt>建什么</dt><dd>follow/like/registration 抽 useClubAction（epoch/locked/六态通用），回执校验作参数注入。</dd>
+          <dt>触及</dt><dd>app/src/features/clubs/useClub*.ts</dd>
+          <dt>验收</dt><dd>三 hook 变薄壳；现有社团测试全绿；P-1 新反馈只加一处。</dd>
+          <dt>阻塞</dt><dd>建议先做 P-1（先补行为再重构，避免重构掩盖验收）。</dd>
+          <dt>范围外</dt><dd>食堂收藏 hook（结构相近另行评估）。</dd>
+        </dl>
+
+        <h3>P-10 ← D-10 移除点评缺省评分</h3>
+        <dl class="kv">
+          <dt>建什么</dt><dd>postProductComment 删 rating 缺省，漏传即抛错；调用方显式传值。</dd>
+          <dt>触及</dt><dd>shared/api/canteen.js</dd>
+          <dt>验收</dt><dd>漏传 rating 抛参数错误；App/Web 点评流程回归通过。</dd>
+          <dt>阻塞</dt><dd>无。</dd>
+          <dt>范围外</dt><dd>rating 枚举类型化。</dd>
+        </dl>
+
+        <h3>P-11 ← D-11 清单符号图标化</h3>
+        <dl class="kv">
+          <dt>建什么</dt><dd>□ 换成 Lucide 方框图标（或平台原生控件位），• 保留排版用。</dd>
+          <dt>触及</dt><dd>app/src/features/campus/wallTemplates.tsx</dd>
+          <dt>验收</dt><dd>模板渲染无模拟控件的文字符号；图标归属符合两层规则；双语排版无回归。</dd>
+          <dt>阻塞</dt><dd>无。</dd>
+          <dt>范围外</dt><dd>树洞模板同类排查（另行处理）。</dd>
+        </dl>
+      </div>
+    </section>
+
+  </article>
+
+  <footer class="colophon">
+    本页为 docs/app/evaluation/三模块审计-食堂社团万能墙-2026-10-25.md 的渲染版，事实与该文档一致。审计方式：Standards/Spec 双轴并行子代理，主审复验全部 11 项缺陷证据。生成于 2026-10-25。
+  </footer>
+
+</main>
+</body>
+</html>
