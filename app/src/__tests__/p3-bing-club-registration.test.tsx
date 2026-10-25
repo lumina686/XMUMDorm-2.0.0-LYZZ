@@ -57,6 +57,15 @@ describe('社团活动报名状态', () => {
     expect(hook.result.current.state).toBe('denied');
   });
 
+  it('网络失败进入失败态，且不发明人数', async () => {
+    register.mockRejectedValue(new TypeError('Network request failed'));
+    const hook = await renderHook(() => useClubActivityRegistration(7));
+
+    await act(async () => { await hook.result.current.register(); });
+    expect(hook.result.current.state).toBe('failed');
+    expect(hook.result.current.snapshot).toBeNull();
+  });
+
   it('同一请求不重复提交，切换活动后忽略旧返回', async () => {
     let resolveOld: (value: unknown) => void = () => undefined;
     register.mockImplementation(() => new Promise((resolve) => { resolveOld = resolve; }));
