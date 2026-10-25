@@ -627,6 +627,8 @@ export const en: Record<MessageKey, string> = {
   'clubs.deleteActivity': 'Delete activity',
   'clubs.deletePost': 'Delete post',
   'clubs.actionFailed': 'Action was not completed. Retry.',
+  'clubs.notice.login': 'Not signed in: sign in to follow this club',
+  'clubs.notice.failed': 'Unstable network, the follow did not take effect; check your connection and try again',
   'screen.campus.search.title': 'Search Treehole',
   'screen.campus.mediaPosition': 'Image {index} of {total}',
   'screen.campus.search.placeholder': 'Search Treehole',

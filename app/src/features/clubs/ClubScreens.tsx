@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { AlertDialog } from '@/components/ui/AlertDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { InlineNotice } from '@/components/ui/InlineNotice';
 import { ListScreen, useListPagination } from '@/components/ui/ListScreen';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { MediaGrid } from '@/components/ui/MediaGrid';
@@ -197,6 +198,17 @@ export function ClubProfileScreen({ clubId }: { clubId: string }): React.ReactEl
           disabled={follow.state === 'working'}
           onPress={() => void follow.toggle()}
         />
+        {follow.state === 'login' ? (
+          <InlineNotice
+            testID="club-profile-follow-notice"
+            tone="info"
+            message={t('clubs.notice.login')}
+            actionLabel={t('action.login')}
+            onAction={() => router.push('/login')}
+          />
+        ) : follow.state === 'failed' ? (
+          <InlineNotice testID="club-profile-follow-notice" tone="danger" message={t('clubs.notice.failed')} />
+        ) : null}
         {joinInfo.contactText ? <Text role="body">{joinInfo.contactText}</Text> : null}
         <Text role="caption">{t('clubs.members', { n: members.length })}</Text>
         {activities.length > 0 ? <Text role="headline">{t('clubs.activities')}</Text> : null}

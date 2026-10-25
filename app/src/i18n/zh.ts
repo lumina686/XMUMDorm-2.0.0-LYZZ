@@ -635,6 +635,8 @@ export const zh = {
   'clubs.deleteActivity': '删除活动',
   'clubs.deletePost': '删除动态',
   'clubs.actionFailed': '操作未完成，请重试',
+  'clubs.notice.login': '尚未登录：登录后才能关注社团',
+  'clubs.notice.failed': '网络不稳定，这次关注没有生效；检查网络后再试一次',
   'screen.campus.search.title': '搜索树洞',
   'screen.campus.mediaPosition': '第 {index} 张，共 {total} 张',
   'screen.campus.search.placeholder': '搜索树洞',
