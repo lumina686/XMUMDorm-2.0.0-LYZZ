@@ -781,8 +781,9 @@ describe('万能墙清单模板图标化', () => {
   it('checklist 每行渲染方框图标，不再出现文字符号', async () => {
     const view = await renderApp(<WallTemplateContent templateKey="checklist" content={'买水\n买咖啡'} />);
     expect(view.queryByText(/□/)).toBeNull();
-    expect(view.getByTestId('wall-checklist-icon-0')).toBeTruthy();
-    expect(view.getByTestId('wall-checklist-icon-1')).toBeTruthy();
+    // 装饰图标对读屏隐藏（宪法 16.5-4），查询需显式包含隐藏元素
+    expect(view.getByTestId('wall-checklist-icon-0', { includeHiddenElements: true })).toBeTruthy();
+    expect(view.getByTestId('wall-checklist-icon-1', { includeHiddenElements: true })).toBeTruthy();
   });
 
   it('note 模板保留排版圆点', async () => {
