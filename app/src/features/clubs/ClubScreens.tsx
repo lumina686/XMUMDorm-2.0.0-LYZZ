@@ -13,6 +13,7 @@ import { ListScreen, useListPagination } from '@/components/ui/ListScreen';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { MediaGrid } from '@/components/ui/MediaGrid';
 import { Screen } from '@/components/ui/Screen';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Text } from '@/components/ui/Text';
 import { useTheme } from '@/design-system/theme';
 import { useI18n } from '@/i18n';
@@ -270,6 +271,8 @@ export function ClubManageScreen({ clubId }: { clubId: string }): React.ReactEle
   const [removing, setRemoving] = React.useState<ClubProfile['members'][number] | null>(null);
   const [actionError, setActionError] = React.useState<ClubActionNoticeState | null>(null);
   const [inviteEmail, setInviteEmail] = React.useState('');
+  const [inviteRole, setInviteRole] = React.useState<'member' | 'admin'>('member');
+  const [inviteError, setInviteError] = React.useState<'missing' | ClubActionNoticeState | null>(null);
   const load = React.useCallback(async () => {
     if (id === null) return;
     setLoading(true); setError(null);
@@ -298,6 +301,21 @@ export function ClubManageScreen({ clubId }: { clubId: string }): React.ReactEle
     return <Screen titleKey="clubs.manage" showMailbox={false} testID="club-manage-unavailable"><ErrorState error={error ?? { kind: 'unknown' }} onAction={() => void load()} /></Screen>;
   }
   const managedProfile = profile;
+  const invite = async (): Promise<void> => {
+    const email = inviteEmail.trim();
+    if (!email) return;
+    setInviteError(null);
+    try {
+      const acknowledgement = await addClubMember(managedProfile.id, email, inviteRole);
+      if (!acknowledgement || typeof acknowledgement !== 'object' || (acknowledgement as { status?: unknown }).status !== 0) throw new Error('Invalid invite acknowledgement');
+      setInviteEmail('');
+      await load();
+    } catch (cause) {
+      if ((cause as { status?: unknown } | null)?.status === 404) { setInviteError('missing'); return; }
+      const failure = classifyAuthFailure(cause);
+      setInviteError(isSessionInvalid(failure) ? 'login' : failure === 'sanctioned' ? 'denied' : 'failed');
+    }
+  };
   if (!managedProfile.basicInfo.viewer.canManage) {
     return <Screen titleKey="clubs.manage" showMailbox={false} testID="club-manage-denied"><EmptyState kind="broken" title={t('clubs.manageDenied')} actionLabel={t('clubs.back')} onAction={back} /><Button testID="club-manage-back" label={t('clubs.back')} variant="link" onPress={back} /></Screen>;
   }
@@ -312,19 +330,33 @@ export function ClubManageScreen({ clubId }: { clubId: string }): React.ReactEle
           testID="club-manage-invite-input"
           kind="email"
           value={inviteEmail}
-          onChangeText={setInviteEmail}
+          onChangeText={(next) => { setInviteEmail(next); if (inviteError !== null) setInviteError(null); }}
           label={t('clubs.invite.label')}
           placeholder={t('clubs.invite.placeholder')}
           clearable
+        />
+        <SegmentedControl
+          testID="club-manage-invite-role"
+          value={inviteRole}
+          onChange={(next) => setInviteRole(next === 'admin' ? 'admin' : 'member')}
+          options={[
+            { value: 'member', label: t('clubs.role.member') },
+            { value: 'admin', label: t('clubs.role.admin') },
+          ]}
         />
         <Button
           testID="club-manage-invite"
           label={t('clubs.invite.action')}
           disabled={!inviteEmail.trim()}
-          onPress={() => { const email = inviteEmail.trim(); if (email) void mutate(() => addClubMember(managedProfile.id, email, 'member')); }}
+          onPress={() => void invite()}
         />
+        {inviteError === 'missing' ? (
+          <InlineNotice testID="club-manage-invite-error" tone="danger" message={t('clubs.invite.missing')} />
+        ) : inviteError !== null ? (
+          <ClubActionNotice state={inviteError} testID="club-manage-notice" onLogin={() => router.push('/login')} />
+        ) : null}
         <Text role="headline">{t('clubs.members', { n: managedProfile.members.length })}</Text>
-        {managedProfile.members.map((member) => <View key={member.id} style={{ gap: theme.space('space_1') }}><Text role="body">{member.nickname}</Text>{member.role === 'member' ? <Button testID={`club-manage-remove-${member.id}`} label={t('clubs.removeMember')} variant="danger" onPress={() => setRemoving(member)} /> : null}</View>)}
+        {managedProfile.members.map((member) => <View key={member.id} testID={`club-manage-member-${member.id}`} style={{ gap: theme.space('space_1') }}><Text role="body">{member.nickname}</Text><Text role="caption" colorToken="text-muted">{t(member.role === 'admin' ? 'clubs.role.admin' : 'clubs.role.member')}</Text>{member.role === 'member' ? <Button testID={`club-manage-remove-${member.id}`} label={t('clubs.removeMember')} variant="danger" onPress={() => setRemoving(member)} /> : null}</View>)}
         {activities.map((activity) => <Button key={activity.id} label={`${t('clubs.deleteActivity')} · ${activity.title}`} variant="danger" onPress={() => void mutate(() => deleteClubActivity(activity.id))} />)}
         {posts.map((post) => <Button key={post.id} label={`${t('clubs.deletePost')} · ${post.content}`} variant="danger" onPress={() => void mutate(() => deleteClubPost(post.id))} />)}
       </View>
