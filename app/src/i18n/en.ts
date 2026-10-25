@@ -35,6 +35,8 @@ export const en: Record<MessageKey, string> = {
   'screen.campus.read.comments': 'Comments',
   'screen.campus.read.report': 'Report',
   'screen.campus.read.delete': 'Delete',
+  'screen.campus.read.deleteBody': 'This cannot be undone. Delete this post?',
+  'screen.campus.read.deleteFailed': 'Delete did not finish and the post is still there: check your connection and retry, or go back and refresh',
   'screen.campus.read.reply': 'Reply',
   'screen.campus.read.collapse': 'Collapse',
   'screen.campus.read.more': 'Read more',
