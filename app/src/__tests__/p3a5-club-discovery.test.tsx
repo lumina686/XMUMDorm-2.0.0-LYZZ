@@ -1,7 +1,21 @@
 import * as React from 'react';
-import { fireEvent, waitFor, within } from '@testing-library/react-native';
+import { act, fireEvent, waitFor, within } from '@testing-library/react-native';
 
 import { renderApp } from './helpers/renderApp';
+
+/** 捕获分页 props：用例自己触发 append（FlashList 的滚动在 Jest 里不触发） */
+let capturedListProps: { onEndReached: () => void };
+jest.mock('@/components/ui/ListScreen', () => {
+  const actual = jest.requireActual('@/components/ui/ListScreen');
+  const React = require('react');
+  return {
+    ...actual,
+    ListScreen: (props: { onEndReached: () => void }) => {
+      capturedListProps = props;
+      return React.createElement(actual.ListScreen, { ...props, onEndReached: () => undefined });
+    },
+  };
+});
 
 jest.mock('expo-router', () => {
   const state = { pushed: [] as unknown[], replaced: [] as unknown[], params: {} as Record<string, string> };
@@ -138,5 +152,34 @@ describe('P3A5-02 社团发现与主页', () => {
     api.listClubs.mockClear();
     await fireEvent.press(view.getByTestId('club-search-clear'));
     await waitFor(() => expect(api.listClubs).toHaveBeenCalledWith(expect.not.objectContaining({ q: 'choir' })));
+  });
+
+  it('分类筛选后翻页仍带该分类，并从第 2 页起', async () => {
+    api.listClubs.mockResolvedValue({ list: [CLUB], page: 1, pageSize: 20, hasMore: true });
+    const view = await renderApp(<ClubDiscoveryScreen />);
+
+    await waitFor(() => expect(view.getByTestId('club-list-row-7')).toBeTruthy());
+    await fireEvent.press(view.getByTestId('club-filter-chip-music'));
+    await waitFor(() => expect(api.listClubs).toHaveBeenCalledWith(expect.objectContaining({ category: 'music' })));
+
+    api.listClubs.mockClear();
+    await act(async () => { capturedListProps.onEndReached(); });
+    await waitFor(() => expect(api.listClubs).toHaveBeenCalledWith(expect.objectContaining({ page: 2, category: 'music' })));
+  });
+
+  it('迟到的未筛选响应不覆盖已筛选列表', async () => {
+    let resolveFirst: (value: unknown) => void = () => undefined;
+    api.listClubs.mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }));
+    const view = await renderApp(<ClubDiscoveryScreen />);
+
+    await waitFor(() => expect(api.listClubs).toHaveBeenCalledTimes(1));
+    const ORCHESTRA = { ...CLUB, id: 8, name: 'Orchestra' };
+    api.listClubs.mockResolvedValueOnce({ list: [ORCHESTRA], page: 1, pageSize: 20, hasMore: false });
+    await fireEvent.press(view.getByTestId('club-filter-chip-music'));
+    await waitFor(() => expect(view.getByTestId('club-list-row-8')).toBeTruthy());
+
+    await act(async () => { resolveFirst({ list: [{ ...CLUB, id: 9, name: 'Stale' }], page: 1, pageSize: 20, hasMore: false }); });
+    expect(view.queryByTestId('club-list-row-9')).toBeNull();
+    expect(view.getByTestId('club-list-row-8')).toBeTruthy();
   });
 });
