@@ -13,6 +13,8 @@ export type Post = {
   user_liked?: boolean;
   like_count?: number;
   comment_count?: number;
+  /** 万能墙专属：这条投稿是不是当前登录用户发的（后端 viewer_is_author，匿名域唯一身份信号） */
+  is_mine?: boolean;
   title?: string | null;
   content: string;
   created_at?: string;
@@ -64,6 +66,7 @@ export function asWall(value: unknown): Post {
     liked: row.liked,
     like_count: row.like_count,
     comment_count: row.comment_count,
+    is_mine: (value as { viewer_is_author?: unknown } | null)?.viewer_is_author === 1 ? true : undefined,
   };
 }
 

@@ -7,21 +7,28 @@ import { Button } from '@/components/ui/Button';
 import { AlertDialog } from '@/components/ui/AlertDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { FilterChips } from '@/components/ui/FilterChips';
+import { InlineNotice } from '@/components/ui/InlineNotice';
+import { Input } from '@/components/ui/Input';
 import { ListScreen, useListPagination } from '@/components/ui/ListScreen';
+import { ListItem } from '@/components/ui/ListItem';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { MediaGrid } from '@/components/ui/MediaGrid';
 import { Screen } from '@/components/ui/Screen';
+import { SearchField } from '@/components/ui/SearchField';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Text } from '@/components/ui/Text';
 import { useTheme } from '@/design-system/theme';
 import { useI18n } from '@/i18n';
+import type { MessageKey } from '@/i18n';
 import { DetailScreen } from '@/proto/P3';
-import { deleteClubActivity, deleteClubPost, getActivityDetail, getClubPostDetail, getClubProfile, listClubs, listMyClubs, removeClubMember } from '../../../../shared/api/clubs';
-import { readClubActivityDetail, readClubPage, readClubPostDetail, readClubProfile, type ClubActivityDetail, type ClubPostDetail, type ClubProfile, type ClubSummary } from './model';
-import { useClubActivityRegistration } from './useClubActivityRegistration';
+import { addClubMember, deleteClubActivity, deleteClubPost, getActivityDetail, getClubPostDetail, getClubProfile, listClubs, listMyClubs, removeClubMember } from '../../../../shared/api/clubs';
+import { readClubActivityDetail, readClubPage, readClubPostDetail, readClubProfile, CLUB_CATEGORIES, type ClubActivityDetail, type ClubCategory, type ClubPostDetail, type ClubProfile, type ClubSummary } from './model';
+import { useClubActivityRegistration, type ClubActivityRegistrationState } from './useClubActivityRegistration';
 import { useClubComments } from './useClubComments';
 import { exportClubActivityRegistrationsToDevice } from './exportRegistrations';
-import { useClubFollow } from './useClubFollow';
-import { useClubLike } from './useClubLike';
+import { useClubFollow, type ClubFollowState } from './useClubFollow';
+import { useClubLike, type ClubLikeState } from './useClubLike';
 import { useSession } from '@/features/auth/session';
 import { classifyAuthFailure, isSessionInvalid } from '@/features/auth/authFailure';
 
@@ -34,6 +41,23 @@ function appError(error: unknown): { kind: 'content' | 'permission' | 'unreachab
   if (status === 404) return { kind: 'content' };
   if (status === 401 || status === 403) return { kind: 'permission' };
   return { kind: error instanceof TypeError ? 'unreachable' : 'unknown' };
+}
+
+type ClubActionNoticeState = ClubFollowState | ClubLikeState | ClubActivityRegistrationState;
+
+/** Renders the shared failure feedback for club interactions (follow/like/registration). */
+function ClubActionNotice({ state, testID, onLogin }: { state: ClubActionNoticeState; testID: string; onLogin: () => void }): React.ReactElement | null {
+  const { t } = useI18n();
+  if (state === 'login') {
+    return <InlineNotice testID={testID} tone="info" message={t('clubs.notice.login')} actionLabel={t('action.login')} onAction={onLogin} />;
+  }
+  if (state === 'denied') {
+    return <InlineNotice testID={testID} tone="danger" message={t('clubs.notice.denied')} />;
+  }
+  if (state === 'failed') {
+    return <InlineNotice testID={testID} tone="danger" message={t('clubs.notice.failed')} />;
+  }
+  return null;
 }
 
 type ClubActivityPreview = { id: number; title: string };
@@ -70,6 +94,14 @@ function readMyClubs(value: unknown): readonly MyClub[] {
   });
 }
 
+const CATEGORY_LABELS: Record<ClubCategory, MessageKey> = {
+  music: 'clubs.category.music',
+  tech: 'clubs.category.tech',
+  culture: 'clubs.category.culture',
+  sport: 'clubs.category.sport',
+  art: 'clubs.category.art',
+};
+
 export function ClubDiscoveryScreen({ embedded = false }: { embedded?: boolean } = {}): React.ReactElement {
   const router = useRouter();
   const { t } = useI18n();
@@ -77,14 +109,27 @@ export function ClubDiscoveryScreen({ embedded = false }: { embedded?: boolean }
   const [rows, setRows] = React.useState<readonly ClubSummary[]>([]);
   const page = React.useRef(0);
   const pending = React.useRef(false);
+  const generation = React.useRef(0);
+  const [queryInput, setQueryInput] = React.useState('');
+  const query = React.useRef('');
+  const [category, setCategory] = React.useState<ClubCategory | null>(null);
+  const categoryRef = React.useRef<ClubCategory | null>(null);
 
   const load = React.useCallback(async (mode: 'refresh' | 'append') => {
-    if (pending.current || (mode === 'append' && !pagination.hasMore)) return;
-    pending.current = true;
+    if (mode === 'append' && (pending.current || !pagination.hasMore)) return;
+    // refresh 永远放行并作废旧请求；pending 只防翻页重复（对齐食堂检索的竞争丢弃）
+    const issue = ++generation.current;
+    if (mode === 'append') pending.current = true;
     const nextPage = mode === 'refresh' ? 1 : page.current + 1;
     dispatch({ type: mode === 'refresh' ? 'refresh:start' : 'append:start' });
     try {
-      const data = readClubPage(await listClubs({ page: nextPage, pageSize: 20 }));
+      const data = readClubPage(await listClubs({
+        page: nextPage,
+        pageSize: 20,
+        ...(query.current ? { q: query.current } : {}),
+        ...(categoryRef.current ? { category: categoryRef.current } : {}),
+      }));
+      if (issue !== generation.current) return;
       page.current = nextPage;
       setRows((current) => {
         if (mode === 'refresh') return data.rows;
@@ -92,9 +137,9 @@ export function ClubDiscoveryScreen({ embedded = false }: { embedded?: boolean }
       });
       dispatch({ type: mode === 'refresh' ? 'refresh:success' : 'append:success', hasMore: data.hasMore });
     } catch (error) {
-      dispatch({ type: mode === 'refresh' ? 'refresh:failure' : 'append:failure', error: appError(error) });
+      if (issue === generation.current) dispatch({ type: mode === 'refresh' ? 'refresh:failure' : 'append:failure', error: appError(error) });
     } finally {
-      pending.current = false;
+      if (issue === generation.current) pending.current = false;
     }
   }, [dispatch, pagination.hasMore]);
 
@@ -102,8 +147,45 @@ export function ClubDiscoveryScreen({ embedded = false }: { embedded?: boolean }
     void load('refresh');
   }, [load]);
 
+  const submitQuery = (): void => {
+    const next = queryInput.trim();
+    if (next === query.current) return;
+    query.current = next;
+    void load('refresh');
+  };
+
+  const changeQueryInput = (next: string): void => {
+    setQueryInput(next);
+    if (next === '' && query.current !== '') {
+      query.current = '';
+      void load('refresh');
+    }
+  };
+
+  const toggleCategory = (key: string): void => {
+    const next = categoryRef.current === key ? null : (CLUB_CATEGORIES.includes(key as ClubCategory) ? (key as ClubCategory) : null);
+    categoryRef.current = next;
+    setCategory(next);
+    void load('refresh');
+  };
+
   return (
     <FeatureScreen embedded={embedded} titleKey="clubs.title" showMailbox={false} testID="clubs-screen">
+      <SearchField
+        testID="club-search"
+        value={queryInput}
+        onChangeText={changeQueryInput}
+        onSubmit={submitQuery}
+        placeholder={t('clubs.search.placeholder')}
+      />
+      <FilterChips
+        testID="club-filter"
+        itemTestIDPrefix="club-filter-chip"
+        options={CLUB_CATEGORIES.map((key) => ({ key, labelKey: CATEGORY_LABELS[key] }))}
+        selected={category ? [category] : []}
+        onToggle={toggleCategory}
+        onClear={() => toggleCategory(category ?? '')}
+      />
       <ListScreen
         testID="club-list"
         data={rows}
@@ -197,15 +279,16 @@ export function ClubProfileScreen({ clubId }: { clubId: string }): React.ReactEl
           disabled={follow.state === 'working'}
           onPress={() => void follow.toggle()}
         />
+        <ClubActionNotice state={follow.state} testID="club-profile-follow-notice" onLogin={() => router.push('/login')} />
         {joinInfo.contactText ? <Text role="body">{joinInfo.contactText}</Text> : null}
         <Text role="caption">{t('clubs.members', { n: members.length })}</Text>
         {activities.length > 0 ? <Text role="headline">{t('clubs.activities')}</Text> : null}
         {activities.map((activity) => (
-          <Button key={activity.id} testID={`club-profile-activity-${activity.id}`} label={activity.title} variant="secondary" onPress={() => router.push(`/clubs/activity/${activity.id}` as never)} />
+          <ListItem key={activity.id} testID={`club-profile-activity-${activity.id}`} title={activity.title} onPress={() => router.push(`/clubs/activity/${activity.id}` as never)} />
         ))}
         {posts.length > 0 ? <Text role="headline">{t('clubs.posts')}</Text> : null}
         {posts.map((post) => (
-          <Button key={post.id} testID={`club-profile-post-${post.id}`} label={post.content} variant="secondary" onPress={() => router.push(`/clubs/post/${post.id}` as never)} />
+          <ListItem key={post.id} testID={`club-profile-post-${post.id}`} title={post.content} onPress={() => router.push(`/clubs/post/${post.id}` as never)} />
         ))}
         {basicInfo.viewer.canManage ? (
           <Button testID="club-profile-manage" label={t('clubs.manage')} variant="secondary" onPress={() => router.push(`/clubs/${profile.id}/manage` as never)} />
@@ -248,7 +331,10 @@ export function ClubManageScreen({ clubId }: { clubId: string }): React.ReactEle
   const [loading, setLoading] = React.useState(id !== null);
   const [error, setError] = React.useState<ReturnType<typeof appError> | null>(id === null ? { kind: 'content' } : null);
   const [removing, setRemoving] = React.useState<ClubProfile['members'][number] | null>(null);
-  const [actionError, setActionError] = React.useState(false);
+  const [actionError, setActionError] = React.useState<ClubActionNoticeState | null>(null);
+  const [inviteEmail, setInviteEmail] = React.useState('');
+  const [inviteRole, setInviteRole] = React.useState<'member' | 'admin'>('member');
+  const [inviteError, setInviteError] = React.useState<'missing' | ClubActionNoticeState | null>(null);
   const load = React.useCallback(async () => {
     if (id === null) return;
     setLoading(true); setError(null);
@@ -259,12 +345,15 @@ export function ClubManageScreen({ clubId }: { clubId: string }): React.ReactEle
   React.useEffect(() => { void load(); }, [load]);
   const back = (): void => router.replace(id === null ? '/clubs' as never : `/clubs/${id}` as never);
   const mutate = async (operation: () => Promise<unknown>): Promise<void> => {
-    setActionError(false);
+    setActionError(null);
     try {
       const acknowledgement = await operation();
       if (!acknowledgement || typeof acknowledgement !== 'object' || (acknowledgement as { status?: unknown }).status !== 0) throw new Error('Invalid management acknowledgement');
       await load();
-    } catch { setActionError(true); }
+    } catch (cause) {
+      const failure = classifyAuthFailure(cause);
+      setActionError(isSessionInvalid(failure) ? 'login' : failure === 'sanctioned' ? 'denied' : 'failed');
+    }
   };
   if (id === null) {
     return <Screen titleKey="clubs.manage" showMailbox={false} testID="club-manage-unavailable"><EmptyState kind="noResult" title={t('clubs.unavailable')} actionLabel={t('clubs.back')} onAction={back} /></Screen>;
@@ -274,6 +363,21 @@ export function ClubManageScreen({ clubId }: { clubId: string }): React.ReactEle
     return <Screen titleKey="clubs.manage" showMailbox={false} testID="club-manage-unavailable"><ErrorState error={error ?? { kind: 'unknown' }} onAction={() => void load()} /></Screen>;
   }
   const managedProfile = profile;
+  const invite = async (): Promise<void> => {
+    const email = inviteEmail.trim();
+    if (!email) return;
+    setInviteError(null);
+    try {
+      const acknowledgement = await addClubMember(managedProfile.id, email, inviteRole);
+      if (!acknowledgement || typeof acknowledgement !== 'object' || (acknowledgement as { status?: unknown }).status !== 0) throw new Error('Invalid invite acknowledgement');
+      setInviteEmail('');
+      await load();
+    } catch (cause) {
+      if ((cause as { status?: unknown } | null)?.status === 404) { setInviteError('missing'); return; }
+      const failure = classifyAuthFailure(cause);
+      setInviteError(isSessionInvalid(failure) ? 'login' : failure === 'sanctioned' ? 'denied' : 'failed');
+    }
+  };
   if (!managedProfile.basicInfo.viewer.canManage) {
     return <Screen titleKey="clubs.manage" showMailbox={false} testID="club-manage-denied"><EmptyState kind="broken" title={t('clubs.manageDenied')} actionLabel={t('clubs.back')} onAction={back} /><Button testID="club-manage-back" label={t('clubs.back')} variant="link" onPress={back} /></Screen>;
   }
@@ -283,11 +387,40 @@ export function ClubManageScreen({ clubId }: { clubId: string }): React.ReactEle
     <Screen titleKey="clubs.manage" showMailbox={false} testID="club-manage">
       <View style={{ gap: theme.space('space_3') }}>
         <Text role="title" emphasis="strong">{managedProfile.basicInfo.name}</Text>
-        {actionError ? <Text role="body" colorToken="text-danger">{t('clubs.actionFailed')}</Text> : null}
+        {actionError ? <ClubActionNotice state={actionError} testID="club-manage-notice" onLogin={() => router.push('/login')} /> : null}
+        <Input
+          testID="club-manage-invite-input"
+          kind="email"
+          value={inviteEmail}
+          onChangeText={(next) => { setInviteEmail(next); if (inviteError !== null) setInviteError(null); }}
+          label={t('clubs.invite.label')}
+          placeholder={t('clubs.invite.placeholder')}
+          clearable
+        />
+        <SegmentedControl
+          testID="club-manage-invite-role"
+          value={inviteRole}
+          onChange={(next) => setInviteRole(next === 'admin' ? 'admin' : 'member')}
+          options={[
+            { value: 'member', label: t('clubs.role.member') },
+            { value: 'admin', label: t('clubs.role.admin') },
+          ]}
+        />
+        <Button
+          testID="club-manage-invite"
+          label={t('clubs.invite.action')}
+          disabled={!inviteEmail.trim()}
+          onPress={() => void invite()}
+        />
+        {inviteError === 'missing' ? (
+          <InlineNotice testID="club-manage-invite-error" tone="danger" message={t('clubs.invite.missing')} />
+        ) : inviteError !== null ? (
+          <ClubActionNotice state={inviteError} testID="club-manage-notice" onLogin={() => router.push('/login')} />
+        ) : null}
         <Text role="headline">{t('clubs.members', { n: managedProfile.members.length })}</Text>
-        {managedProfile.members.map((member) => <View key={member.id} style={{ gap: theme.space('space_1') }}><Text role="body">{member.nickname}</Text>{member.role === 'member' ? <Button testID={`club-manage-remove-${member.id}`} label={t('clubs.removeMember')} variant="danger" onPress={() => setRemoving(member)} /> : null}</View>)}
-        {activities.map((activity) => <Button key={activity.id} label={`${t('clubs.deleteActivity')} · ${activity.title}`} variant="danger" onPress={() => void mutate(() => deleteClubActivity(activity.id))} />)}
-        {posts.map((post) => <Button key={post.id} label={`${t('clubs.deletePost')} · ${post.content}`} variant="danger" onPress={() => void mutate(() => deleteClubPost(post.id))} />)}
+        {managedProfile.members.map((member) => <View key={member.id} testID={`club-manage-member-${member.id}`} style={{ gap: theme.space('space_1') }}><Text role="body">{member.nickname}</Text><Text role="caption" colorToken="text-muted">{t(member.role === 'admin' ? 'clubs.role.admin' : 'clubs.role.member')}</Text>{member.role === 'member' ? <Button testID={`club-manage-remove-${member.id}`} label={t('clubs.removeMember')} variant="danger" onPress={() => setRemoving(member)} /> : null}</View>)}
+        {activities.map((activity) => <View key={activity.id} style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space('space_2') }}><View style={{ flex: 1 }}><Text role="body">{activity.title}</Text></View><Button testID={`club-manage-delete-activity-${activity.id}`} label={t('clubs.deleteActivity')} variant="danger" onPress={() => void mutate(() => deleteClubActivity(activity.id))} /></View>)}
+        {posts.map((post) => <View key={post.id} style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space('space_2') }}><View style={{ flex: 1 }}><Text role="body">{post.content}</Text></View><Button testID={`club-manage-delete-post-${post.id}`} label={t('clubs.deletePost')} variant="danger" onPress={() => void mutate(() => deleteClubPost(post.id))} /></View>)}
       </View>
       <AlertDialog testID="club-manage-remove-dialog" visible={removing !== null} variant="danger" title={t('clubs.removeMember')} body={t('clubs.removeMemberBody')} confirmLabel={t('clubs.removeMember')} cancelLabel={t('action.cancel')} onCancel={() => setRemoving(null)} onConfirm={() => { const member = removing; setRemoving(null); if (member) void mutate(() => removeClubMember(managedProfile.id, member.id)); }} />
     </Screen>
@@ -391,7 +524,7 @@ export function ClubActivityDetailScreen({ activityId }: { activityId: string })
       onToggleLike={() => void like.toggle()}
       interactions={{ liked: like.liked, likeCount: like.count, commentCount: detail.stats.comments }}
       hero={detail.images.length > 0 ? <MediaGrid testID="club-activity-media" variant="hero" uris={detail.images} /> : undefined}
-      body={<><Text role="body">{detail.summary}</Text><Button testID="club-activity-registration" label={`${t(current.registered ? 'clubs.cancelRegistration' : 'clubs.register')} · ${t('clubs.registrationCount', { n: current.count })}`} loading={registration.state === 'working'} onPress={() => void (current.registered ? registration.cancel() : registration.register())} />{detail.viewer.canManage ? <><Button testID="club-activity-export-registrations" label={t('clubs.exportRegistrations')} loading={exporting} onPress={() => void exportRegistrations()} />{exportFailed ? <Text role="body" colorToken="text-danger">{t('clubs.exportFailed')}</Text> : null}</> : null}{comments.body}</>}
+      body={<><ClubActionNotice state={like.state} testID="club-like-notice" onLogin={() => router.push('/login')} /><Text role="body">{detail.summary}</Text><Button testID="club-activity-registration" label={t(current.registered ? 'clubs.cancelRegistration' : 'clubs.register')} loading={registration.state === 'working'} onPress={() => void (current.registered ? registration.cancel() : registration.register())} /><Text testID="club-activity-registration-count" role="caption" colorToken="text-muted">{t('clubs.registrationCount', { n: current.count })}</Text><ClubActionNotice state={registration.state} testID="club-activity-registration-notice" onLogin={() => router.push('/login')} />{detail.viewer.canManage ? <><Button testID="club-activity-export-registrations" label={t('clubs.exportRegistrations')} loading={exporting} onPress={() => void exportRegistrations()} />{exportFailed ? <Text role="body" colorToken="text-danger">{t('clubs.exportFailed')}</Text> : null}</> : null}{comments.body}</>}
       comments={comments.comments}
       labels={detailLabels(t)}
     />
@@ -430,7 +563,7 @@ export function ClubPostDetailScreen({ postId }: { postId: string }): React.Reac
       onToggleLike={() => void like.toggle()}
       interactions={{ liked: like.liked, likeCount: like.count, commentCount: detail.stats.comments }}
       hero={detail.images.length > 0 ? <MediaGrid testID="club-post-media" variant="hero" uris={detail.images} /> : undefined}
-      body={<><Text role="body">{detail.content}</Text>{comments.body}</>}
+      body={<><ClubActionNotice state={like.state} testID="club-like-notice" onLogin={() => router.push('/login')} /><Text role="body">{detail.content}</Text>{comments.body}</>}
       comments={comments.comments}
       labels={detailLabels(t)}
     />

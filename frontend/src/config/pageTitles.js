@@ -4,6 +4,7 @@
  */
 
 export const TITLE_BY_PATH_ZH = {
+  '/agent': '校园助手',
   '/': '厦马小筑',
   '/eat': '食堂',
   '/about': '广场',
@@ -28,6 +29,7 @@ export const TITLE_BY_PATH_ZH = {
 };
 
 export const TITLE_BY_PATH_EN = {
+  '/agent': 'Campus assistant',
   '/': 'XMUM Dorm',
   '/eat': 'Canteen',
   '/about': 'Square',

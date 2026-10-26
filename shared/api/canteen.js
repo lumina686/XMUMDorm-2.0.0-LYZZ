@@ -191,7 +191,9 @@ export async function getProductComments(productId, options = {}) {
 
 /** 发表商品点评（一级或二级），FormData: rating, content, parent_id?, images[] */
 export function postProductComment(productId, payload) {
-  const { rating = '人上人', content = '', parent_id, imageFiles = [] } = payload || {};
+  // 档位必须显式：静默缺省曾让 Web 每条回复都被编造成「人上人」（审计 D-10）
+  const { rating, content = '', parent_id, imageFiles = [] } = payload || {};
+  if (!rating) throw new Error('postProductComment requires an explicit rating');
   const form = new FormData();
   form.append('rating', rating);
   form.append('content', String(content).trim());

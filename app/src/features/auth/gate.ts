@@ -15,6 +15,7 @@ import type { SessionStatus } from './session';
 
 /** 需要身份的路径前缀（⛔ 加路径要同时想一想：匿名用户能不能看） */
 export const PROTECTED_ROUTE_PREFIXES: readonly string[] = [
+  '/agent',
   '/me',
   '/mailbox',
   '/publish',
