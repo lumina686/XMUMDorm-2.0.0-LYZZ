@@ -210,7 +210,7 @@ export default function FoodDetail() {
     }));
   };
 
-  const startReply = (review) => setReplyingTo({ id: review.id, userName: review.userName });
+  const startReply = (review) => setReplyingTo({ id: review.id, userName: review.userName, rating: review.rating });
   const cancelReply = () => {
     setReplyingTo(null);
     setNewReply('');
@@ -221,7 +221,8 @@ export default function FoodDetail() {
     if (requireLogin()) return;
     if (!replyingTo || !newReply.trim() || !productId) return;
     setSubmitLoading(true);
-    postProductComment(productId, { content: newReply.trim(), parent_id: replyingTo.id })
+    // 回复不参与综合分（后端仅一级点评计分）；rating 引用被回复的档位，仅为满足后端非空约束
+    postProductComment(productId, { content: newReply.trim(), parent_id: replyingTo.id, rating: replyingTo.rating })
       .then(() => {
         setNewReply('');
         setReplyingTo(null);

@@ -16,6 +16,7 @@ import { SymbolView } from 'expo-symbols';
 import type { AndroidSymbol, SFSymbol } from 'expo-symbols';
 
 import { ActionSheet } from '@/components/ui/ActionSheet';
+import { AlertDialog } from '@/components/ui/AlertDialog';
 import { CommentComposer } from '@/components/ui/CommentComposer';
 import { CommentThread } from '@/components/ui/CommentThread';
 import { Divider } from '@/components/ui/Divider';
@@ -31,7 +32,9 @@ import { useTheme } from '@/design-system/theme';
 import { useI18n } from '@/i18n';
 import type { AppError } from '@/i18n/errors';
 import { getPostDetail } from '../../../../shared/api/posts';
-import { getConfession } from '../../../../shared/api/confessions';
+import { deleteConfession, getConfession } from '../../../../shared/api/confessions';
+import { getQueryClient } from '@/shared/queryClient';
+import { QK } from '../../../../shared/query/queryKeys';
 import { formatPostTime } from '../../../../shared/utils/formatTime';
 import { asPost, asWall, errorFor, type Post } from './campusModel';
 import { TreeholeFeed } from './TreeholeFeed';
@@ -102,6 +105,9 @@ export function CampusDetailScreen({
   const [reportOpen, setReportOpen] = React.useState(false);
   const [reportReason, setReportReason] = React.useState<string | null>(null);
   const [reportDetail, setReportDetail] = React.useState('');
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [deleteError, setDeleteError] = React.useState(false);
+  const [deleteCommentId, setDeleteCommentId] = React.useState<string | null>(null);
   const scrollRef = React.useRef<ScrollView | null>(null);
   const generation = React.useRef(0);
 
@@ -178,6 +184,26 @@ export function CampusDetailScreen({
     else if (router.canGoBack()) router.back();
     else router.replace((kind === 'wall' ? '/?tab=wall' : '/') as never);
   }, [kind, published, router]);
+
+  const removeWallPost = React.useCallback(async (): Promise<void> => {
+    setDeleteOpen(false);
+    setDeleteError(false);
+    try {
+      const acknowledgement = await deleteConfession(Number(postId));
+      if (!acknowledgement || typeof acknowledgement !== 'object' || (acknowledgement as { status?: unknown }).status !== 0) {
+        throw new Error('Invalid delete acknowledgement');
+      }
+      const client = getQueryClient();
+      const snapshotKey = [...QK.confessionWindow('_guest'), 'wallReadSnapshot'];
+      const snapshot = client.getQueryData<{ rows?: { id: number }[] }>(snapshotKey);
+      if (snapshot && Array.isArray(snapshot.rows)) {
+        client.setQueryData(snapshotKey, { ...snapshot, rows: snapshot.rows.filter((row) => row.id !== Number(postId)) });
+      }
+      backToFeed();
+    } catch {
+      setDeleteError(true);
+    }
+  }, [backToFeed, postId]);
 
   const headerOptions = React.useMemo(
     () => ({
@@ -307,6 +333,11 @@ export function CampusDetailScreen({
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ paddingBottom: theme.space('space_6') }}
           >
+            {deleteError ? (
+              <View style={{ paddingHorizontal: theme.space('space_4'), paddingTop: theme.space('space_2') }}>
+                <InlineNotice testID="wall-delete-notice" tone="danger" message={t('screen.campus.read.deleteFailed')} />
+              </View>
+            ) : null}
             <TreeholePostDetail
               post={vm}
               timeLabel={timeLabel}
@@ -336,6 +367,14 @@ export function CampusDetailScreen({
               <Text role="label" emphasis="strong" colorToken="text-primary">
                 {t('screen.campus.read.commentsCount', { count: commentCount })}
               </Text>
+              {actions.comments.deleteFailed ? (
+                <InlineNotice
+                  testID="campus-comment-delete-notice"
+                  tone="danger"
+                  message={t('screen.campus.read.deleteCommentFailed')}
+                  style={{ marginTop: theme.space('space_2') }}
+                />
+              ) : null}
             </View>
 
             <View style={{ paddingHorizontal: theme.space('space_4') }}>
@@ -358,6 +397,7 @@ export function CampusDetailScreen({
                   testID="campus-detail-comments"
                   nodes={actions.comments.nodes}
                   onReply={actions.comments.onReply}
+                  onDelete={kind === 'wall' ? (id: string) => setDeleteCommentId(id) : undefined}
                   labels={{
                     anonymous: t('screen.campus.read.anonymous'),
                     deleteLabel: t('screen.campus.read.delete'),
@@ -377,6 +417,17 @@ export function CampusDetailScreen({
                 setMenuOpen(false);
                 setReportOpen(true);
               }}
+              deleteAction={
+                kind === 'wall' && post?.is_mine
+                  ? {
+                      label: t('screen.campus.read.delete'),
+                      onPress: () => {
+                        setMenuOpen(false);
+                        setDeleteOpen(true);
+                      },
+                    }
+                  : undefined
+              }
               reportOpen={reportOpen}
               reportReasons={reportReasons}
               reportReason={reportReason}
@@ -413,6 +464,32 @@ export function CampusDetailScreen({
                 title: t('screen.campus.read.moreActions'),
                 report: t('screen.campus.read.report'),
                 cancel: t('action.cancel'),
+              }}
+            />
+            <AlertDialog
+              testID="wall-delete-dialog"
+              visible={deleteOpen}
+              variant="danger"
+              title={t('screen.campus.read.delete')}
+              body={t('screen.campus.read.deleteBody')}
+              confirmLabel={t('screen.campus.read.delete')}
+              cancelLabel={t('action.cancel')}
+              onCancel={() => setDeleteOpen(false)}
+              onConfirm={() => { void removeWallPost(); }}
+            />
+            <AlertDialog
+              testID="wall-comment-delete-dialog"
+              visible={deleteCommentId !== null}
+              variant="danger"
+              title={t('screen.campus.read.delete')}
+              body={t('screen.campus.read.deleteCommentBody')}
+              confirmLabel={t('screen.campus.read.delete')}
+              cancelLabel={t('action.cancel')}
+              onCancel={() => setDeleteCommentId(null)}
+              onConfirm={() => {
+                const id = deleteCommentId;
+                setDeleteCommentId(null);
+                if (id !== null) actions.comments.deleteComment(id);
               }}
             />
           </ScrollView>
@@ -452,6 +529,7 @@ function DetailSheetHost({
   menuOpen,
   onCloseMenu,
   onReport,
+  deleteAction,
   reportOpen,
   reportReasons,
   reportReason,
@@ -469,6 +547,8 @@ function DetailSheetHost({
   menuOpen: boolean;
   onCloseMenu: () => void;
   onReport: () => void;
+  /** 万能墙作者本人的删除入口；不传（树洞/非作者）时菜单里不出现 */
+  deleteAction?: { label: string; onPress: () => void };
   reportOpen: boolean;
   reportReasons: readonly { value: string; label: string }[];
   reportReason: string | null;
@@ -490,8 +570,12 @@ function DetailSheetHost({
         testID="campus-detail-menu"
         visible={menuOpen}
         title={menuLabels.title}
-        actions={[{ key: 'report', label: menuLabels.report }]}
+        actions={[
+          ...(deleteAction ? [{ key: 'delete', label: deleteAction.label }] : []),
+          { key: 'report', label: menuLabels.report },
+        ]}
         onSelect={(key) => {
+          if (key === 'delete') deleteAction?.onPress();
           if (key === 'report') onReport();
         }}
         onCancel={onCloseMenu}

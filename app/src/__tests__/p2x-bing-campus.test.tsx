@@ -13,6 +13,7 @@ import { act, fireEvent, waitFor, within } from '@testing-library/react-native';
 
 import { Button } from '@/components/ui/Button';
 import { CampusDetailScreen, TreeholeFeed, WallFeed } from '@/features/campus/CampusScreens';
+import { WallTemplateContent } from '@/features/campus/wallTemplates';
 import { getQueryClient } from '@/shared/queryClient';
 import { secondaryTabStore } from '@/features/navigation/secondaryTabs';
 import {
@@ -29,6 +30,8 @@ import {
   getConfessionWindow,
   createConfessionComment,
   toggleConfessionLike,
+  deleteConfession,
+  deleteConfessionComment,
 } from '../../../shared/api/confessions';
 import type { ListScreenProps } from '@/components/ui/ListScreen';
 import { renderApp } from './helpers/renderApp';
@@ -96,6 +99,8 @@ jest.mock('../../../shared/api/confessions', () => ({
   toggleConfessionLike: jest.fn(),
   getConfessionComments: jest.fn(),
   createConfessionComment: jest.fn(),
+  deleteConfession: jest.fn(),
+  deleteConfessionComment: jest.fn(),
 }));
 
 /** 捕获分页 props：用例自己触发 append / refresh（FlashList 的滚动在 Jest 里不触发） */
@@ -685,4 +690,104 @@ describe('树洞四态（中英双语）', () => {
       expect(view.queryByText('secret-endpoint')).toBeNull();
     });
   }
+});
+
+describe('万能墙删除自己的帖子', () => {
+  const removeConfession = deleteConfession as jest.Mock;
+
+  it('作者在 ⋯ 菜单看到删除，确认后删除并返回', async () => {
+    wallDetail.mockResolvedValue({ id: 40, content: '我的墙帖', template_key: 'announcement', viewer_is_author: 1 });
+    removeConfession.mockResolvedValue({ status: 0 });
+    const view = await renderApp(<CampusDetailScreen postId="40" kind="wall" />);
+
+    await waitFor(() => expect(view.getByText('我的墙帖')).toBeTruthy());
+    await fireEvent.press(view.getByTestId('campus-detail-more'));
+    await fireEvent.press(view.getByTestId('campus-detail-menu-delete'));
+    const dialog = view.getByTestId('wall-delete-dialog');
+    await fireEvent.press(within(dialog).getAllByText('删除').at(-1)!);
+    await waitFor(() => expect(removeConfession).toHaveBeenCalledWith(40));
+    await waitFor(() => expect(routerMock.back).toHaveBeenCalled());
+  });
+
+  it('非作者不见删除入口', async () => {
+    wallDetail.mockResolvedValue({ id: 40, content: '别人的墙帖', template_key: 'announcement', viewer_is_author: 0 });
+    const view = await renderApp(<CampusDetailScreen postId="40" kind="wall" />);
+
+    await waitFor(() => expect(view.getByText('别人的墙帖')).toBeTruthy());
+    await fireEvent.press(view.getByTestId('campus-detail-more'));
+    expect(view.queryByTestId('campus-detail-menu-delete')).toBeNull();
+  });
+
+  it('删除失败停留本页并给出可读提示', async () => {
+    wallDetail.mockResolvedValue({ id: 40, content: '我的墙帖', template_key: 'announcement', viewer_is_author: 1 });
+    removeConfession.mockRejectedValue(new TypeError('Network request failed'));
+    const view = await renderApp(<CampusDetailScreen postId="40" kind="wall" />);
+
+    await waitFor(() => expect(view.getByText('我的墙帖')).toBeTruthy());
+    await fireEvent.press(view.getByTestId('campus-detail-more'));
+    await fireEvent.press(view.getByTestId('campus-detail-menu-delete'));
+    await fireEvent.press(within(view.getByTestId('wall-delete-dialog')).getAllByText('删除').at(-1)!);
+    await waitFor(() => expect(view.getByTestId('wall-delete-notice')).toBeTruthy());
+    expect(routerMock.back).not.toHaveBeenCalled();
+  });
+});
+
+describe('万能墙删除自己的评论', () => {
+  const wallComments = getConfessionComments as jest.Mock;
+  const removeComment = deleteConfessionComment as jest.Mock;
+  const OWN_AND_OTHER = [
+    { id: 11, parent_id: null, content: '我的评论', author: { display_name: '匿名', display_name_en: 'Anonymous' }, viewer_is_mine: true, created_at: '2026-10-15T02:42:00.000Z' },
+    { id: 12, parent_id: null, content: '别人的评论', author: { display_name: '匿名', display_name_en: 'Anonymous' }, viewer_is_mine: false, created_at: '2026-10-15T02:42:00.000Z' },
+  ];
+
+  it('自己的评论有删除动作，别人的没有', async () => {
+    wallDetail.mockResolvedValue({ id: 40, content: '正文', template_key: 'announcement' });
+    wallComments.mockResolvedValue(OWN_AND_OTHER);
+    const view = await renderApp(<CampusDetailScreen postId="40" kind="wall" />);
+
+    await waitFor(() => expect(view.getByText('我的评论')).toBeTruthy());
+    expect(within(view.getByTestId('campus-detail-comments-11')).getByText('删除')).toBeTruthy();
+    expect(within(view.getByTestId('campus-detail-comments-12')).queryByText('删除')).toBeNull();
+  });
+
+  it('确认后删除评论，节点消失', async () => {
+    wallDetail.mockResolvedValue({ id: 40, content: '正文', template_key: 'announcement' });
+    wallComments.mockResolvedValue(OWN_AND_OTHER);
+    removeComment.mockResolvedValue({ status: 0 });
+    const view = await renderApp(<CampusDetailScreen postId="40" kind="wall" />);
+
+    await waitFor(() => expect(view.getByText('我的评论')).toBeTruthy());
+    await fireEvent.press(within(view.getByTestId('campus-detail-comments-11')).getByText('删除'));
+    await fireEvent.press(within(view.getByTestId('wall-comment-delete-dialog')).getAllByText('删除').at(-1)!);
+    await waitFor(() => expect(removeComment).toHaveBeenCalledWith(40, 11));
+    await waitFor(() => expect(view.queryByTestId('campus-detail-comments-11')).toBeNull());
+  });
+
+  it('删除评论失败节点恢复并提示', async () => {
+    wallDetail.mockResolvedValue({ id: 40, content: '正文', template_key: 'announcement' });
+    wallComments.mockResolvedValue(OWN_AND_OTHER);
+    removeComment.mockRejectedValue(new TypeError('Network request failed'));
+    const view = await renderApp(<CampusDetailScreen postId="40" kind="wall" />);
+
+    await waitFor(() => expect(view.getByText('我的评论')).toBeTruthy());
+    await fireEvent.press(within(view.getByTestId('campus-detail-comments-11')).getByText('删除'));
+    await fireEvent.press(within(view.getByTestId('wall-comment-delete-dialog')).getAllByText('删除').at(-1)!);
+    await waitFor(() => expect(view.getByTestId('campus-comment-delete-notice')).toBeTruthy());
+    expect(view.getByTestId('campus-detail-comments-11')).toBeTruthy();
+  });
+});
+
+describe('万能墙清单模板图标化', () => {
+  it('checklist 每行渲染方框图标，不再出现文字符号', async () => {
+    const view = await renderApp(<WallTemplateContent templateKey="checklist" content={'买水\n买咖啡'} />);
+    expect(view.queryByText(/□/)).toBeNull();
+    // 装饰图标对读屏隐藏（宪法 16.5-4），查询需显式包含隐藏元素
+    expect(view.getByTestId('wall-checklist-icon-0', { includeHiddenElements: true })).toBeTruthy();
+    expect(view.getByTestId('wall-checklist-icon-1', { includeHiddenElements: true })).toBeTruthy();
+  });
+
+  it('note 模板保留排版圆点', async () => {
+    const view = await renderApp(<WallTemplateContent templateKey="note" content={'一行\n两行'} />);
+    expect(view.getAllByText(/• /)).toHaveLength(2);
+  });
 });

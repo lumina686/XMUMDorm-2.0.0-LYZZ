@@ -20,13 +20,15 @@ it('offers a labelled heart favorite action with a visible state', async () => {
   expect(view.getByTestId('favorite-heart-glyph').props.fill).toBe('none');
   expect(view.getByTestId('dish-favorite').props.accessibilityLabel).toBe('收藏');
 });
-it('keeps review outside the scrolling content with reserved measured space and missing-image fallback', async () => {
+it('renders the actions bar in the screen footer slot, outside the scrolling content', async () => {
   const view = await renderApp(<DishDetail />);
   await waitFor(() => expect(view.getByText('Rice')).toBeTruthy());
-  const overlay = view.getByTestId('dish-actions-overlay');
-  expect(within(view.getByTestId('dish-scroll')).queryByTestId('dish-actions-overlay')).toBeNull();
-  await fireEvent(overlay, 'layout', { nativeEvent: { layout: { height: 100 } } });
-  expect(StyleSheet.flatten(view.getByTestId('dish-scroll').props.contentContainerStyle).paddingBottom).toBeGreaterThan(100);
+  expect(within(view.getByTestId('screen-footer')).getByTestId('dish-actions-footer')).toBeTruthy();
+  expect(within(view.getByTestId('dish-scroll')).queryByTestId('dish-actions-footer')).toBeNull();
+  expect(view.queryByTestId('dish-actions-overlay')).toBeNull();
+  const scrollStyle = StyleSheet.flatten(view.getByTestId('dish-scroll').props.contentContainerStyle);
+  expect(scrollStyle.paddingBottom).toBeUndefined();
+  expect(scrollStyle.padding).toBeTruthy();
   expect(view.getByTestId('dish-images-placeholder')).toBeTruthy();
 });
 it('uses one image entry until the review limit and enables it again after removal', async () => {

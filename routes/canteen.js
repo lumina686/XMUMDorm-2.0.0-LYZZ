@@ -29,6 +29,7 @@ const { assetUrl } = require('../utils/assets');
 const { uploadBuffer } = require('../services/objectStorage');
 const { prepareImageUpload } = require('../services/imageProcessing');
 const { simpleCache } = require('../utils/simpleCache');
+const { parseOptionalUser } = require('../utils/parseOptionalUser');
 const { grantExp } = require('../services/expService');
 const { attachExp } = require('../utils/expResponse');
 const { isQualityReview } = require('../utils/expEligibility');
@@ -214,18 +215,8 @@ function isAdmin(req) {
 
 /** 可选登录：若有 Authorization 则解析出 req.user，否则 req.user 为 null */
 function optionalAuth(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  if (!token) {
-    req.user = null;
-    return next();
-  }
-  const jwt = require('jsonwebtoken');
-  const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-  jwt.verify(token, JWT_SECRET, (err, decoded) => {
-    req.user = err ? null : decoded;
-    next();
-  });
+  req.user = parseOptionalUser(req);
+  next();
 }
 
 /** 校验当前用户是否为某店铺的店主 */
